@@ -1,4 +1,8 @@
 package es.eriktorr
 package electronics
 
-final class ElectronicsServiceSuite
+import munit.FunSuite
+
+final class ElectronicsServiceSuite extends FunSuite:
+  test("should work"):
+    fail("not implemented")
