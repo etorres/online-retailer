@@ -1,0 +1,18 @@
+services:
+  postgres:
+    image: postgres
+    hostname: postgres.test
+    container_name: postgres.test
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_PASSWORD: s3c4Et
+    volumes:
+      - "./modules/commons/commons-database/src/test/resources/postgres:/docker-entrypoint-initdb.d"
+
+  adminer:
+    image: adminer
+    hostname: adminer.test
+    container_name: adminer.test
+    ports:
+      - "8082:8080"

@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Configuration status="WARN">
+    <Appenders>
+        <Console name="ConsoleAppender" target="SYSTEM_OUT">
+            <JsonTemplateLayout eventTemplateUri="classpath:EcsLayout.json"/>
+        </Console>
+        <File name="FileAppender" fileName="target/logs/test.log" createOnDemand="true">
+            <JsonTemplateLayout eventTemplateUri="classpath:EcsLayout.json"/>
+        </File>
+    </Appenders>
+    <Loggers>
+        <AsyncLogger name="es.eriktorr" level="INFO" additivity="false">
+            <AppenderRef ref="ConsoleAppender"/>
+        </AsyncLogger>
+        <AsyncLogger name="debug-logger" level="DEBUG" additivity="false">
+            <AppenderRef ref="ConsoleAppender"/>
+        </AsyncLogger>
+        <AsyncLogger name="test-logger" level="INFO" additivity="false">
+            <AppenderRef ref="FileAppender"/>
+        </AsyncLogger>
+        <AsyncRoot level="ERROR">
+            <AppenderRef ref="ConsoleAppender"/>
+        </AsyncRoot>
+    </Loggers>
+</Configuration>
