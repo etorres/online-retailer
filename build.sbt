@@ -185,19 +185,78 @@ lazy val `commons-lang` = project
       "org.apache.logging.log4j" % "log4j-core" % "2.24.3" % Test,
       "org.apache.logging.log4j" % "log4j-layout-template-json" % "2.24.3" % Test,
       "org.apache.logging.log4j" % "log4j-slf4j2-impl" % "2.24.3" % Test,
+      "org.typelevel" %% "cats-collections-core" % "0.9.9" % Test,
       "org.typelevel" %% "cats-effect" % "3.5.7" % Optional,
       "org.typelevel" %% "log4cats-slf4j" % "2.7.0" % Test,
       "org.typelevel" %% "squants" % "1.8.3" % Optional,
     ),
   )
 
-lazy val `electronics-dsl` = project
-  .in(file("modules/electronics/electronics-dsl"))
+lazy val `electronics-client` = project
+  .in(file("modules/electronics/electronics-client"))
   .configure(withBaseSettings)
   .settings(
     libraryDependencies ++= Seq(),
   )
+  .dependsOn(
+    `commons-grpc`,
+    `electronics-dsl` % "test->test;compile->compile",
+    `electronics-protobuf`,
+  )
+
+lazy val `electronics-dsl` = project
+  .in(file("modules/electronics/electronics-dsl"))
+  .configure(withBaseSettings)
+  .settings(
+    libraryDependencies ++= Seq(
+      "io.github.arainko" %% "ducktape" % "0.2.7",
+      "io.github.iltotore" %% "iron" % "2.6.0",
+      "io.hypersistence" % "hypersistence-tsid" % "2.1.3",
+      "org.typelevel" %% "cats-core" % "2.13.0",
+      "org.typelevel" %% "cats-effect" % "3.5.7",
+      "org.typelevel" %% "squants" % "1.8.3",
+    ),
+  )
   .dependsOn(`commons-lang` % "test->test;compile->compile")
+
+lazy val `electronics-protobuf` = project
+  .in(file("modules/electronics/electronics-protobuf"))
+  .configure(usingProtobuf)
+  .settings(
+    libraryDependencies ++= Seq(
+      "com.thesamet.scalapb" %% "scalapb-runtime" % scalapb.compiler.Version.scalapbVersion % "protobuf",
+      "org.typelevel" %% "squants" % "1.8.3",
+    ),
+  )
+  .dependsOn(
+    `commons-grpc`,
+    `electronics-dsl` % "test->test;compile->compile",
+  )
+  .enablePlugins(Fs2Grpc)
+
+lazy val `electronics-service` = project
+  .in(file("modules/electronics/electronics-service"))
+  .configure(withBaseSettings)
+  .settings(
+    libraryDependencies ++= Seq(
+      "com.lmax" % "disruptor" % "3.4.4" % Runtime,
+      "com.monovore" %% "decline-effect" % "2.5.0",
+      "org.apache.logging.log4j" % "log4j-core" % "2.24.3" % Runtime,
+      "org.apache.logging.log4j" % "log4j-layout-template-json" % "2.24.3" % Runtime,
+      "org.apache.logging.log4j" % "log4j-slf4j2-impl" % "2.24.3" % Runtime,
+      "org.typelevel" %% "cats-core" % "2.13.0",
+      "org.typelevel" %% "cats-effect" % "3.5.7",
+      "org.typelevel" %% "log4cats-slf4j" % "2.7.0",
+    ),
+    Universal / maintainer := "https://github.com/etorres/online-retailer",
+  )
+  .dependsOn(
+    `commons-database` % "test->test;compile->compile",
+    `commons-grpc` % "test->test;compile->compile",
+    `electronics-dsl` % "test->test;compile->compile",
+    `electronics-protobuf`,
+  )
+  .enablePlugins(JavaAppPackaging)
 
 lazy val `inventory-dsl` = project
   .in(file("modules/inventory/inventory-dsl"))
@@ -227,7 +286,10 @@ lazy val root = project
     `commons-database`,
     `commons-grpc`,
     `commons-lang`,
+    `electronics-client`,
     `electronics-dsl`,
+    `electronics-protobuf`,
+    `electronics-service`,
     `inventory-dsl`,
     `product-search`,
   )

@@ -1,0 +1,74 @@
+syntax = "proto3";
+
+package es.eriktorr.electronics;
+
+import "scalapb/scalapb.proto";
+
+option (scalapb.options) = {
+  import: "es.eriktorr.electronics.given"
+};
+
+message ElectronicDevice {
+  int64 sku = 1;
+  string category = 2;
+  string model = 3;
+  string powerConsumption = 4 [(scalapb.field).type = "squants.energy.Power"];
+  string price = 5 [(scalapb.field).type = "squants.market.Money"];
+  string description = 6;
+  repeated string images = 7;
+  reserved 100 to 200;
+}
+
+message ElectronicsRequest {
+  message Filter {
+    message SearchTerm {
+      enum Field {
+        Category = 0;
+        Model = 1;
+      };
+
+      Field field = 1;
+      repeated string values = 2;
+    };
+
+    message PriceRange {
+      string min = 1 [(scalapb.field).type = "squants.market.Money"];
+      string max = 2 [(scalapb.field).type = "squants.market.Money"];
+    };
+
+    message PowerConsumptionRange {
+      string min = 1 [(scalapb.field).type = "squants.energy.Power"];
+      string max = 2 [(scalapb.field).type = "squants.energy.Power"];
+    };
+
+    repeated SearchTerm search_terms = 1;
+    PriceRange price_range = 2;
+    PowerConsumptionRange power_consumption_range = 3;
+  }
+
+  message Sort {
+    enum Field {
+      Price = 0;
+      PowerConsumption = 1;
+    };
+
+    enum Order {
+      Ascending = 0;
+      Descending = 1;
+    };
+
+    Field field = 1;
+    Order order = 2;
+  }
+
+  optional Filter filter = 1;
+  optional Sort sort = 2;
+}
+
+message ElectronicsReply {
+  repeated ElectronicDevice electronic_devices = 1;
+}
+
+service Electronics {
+  rpc SendElectronicsStream (stream ElectronicsRequest) returns (stream ElectronicsReply) {}
+}

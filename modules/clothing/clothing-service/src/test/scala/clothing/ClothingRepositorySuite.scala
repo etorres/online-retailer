@@ -7,11 +7,13 @@ import clothing.db.GarmentConnection.{sortablePrice, given}
 import clothing.db.TestClothingRepository
 import commons.market.EuroMoneyContext.given
 import commons.query.Filter.Combinator.{And, In}
+import commons.query.Filter.Comparator.Between
 import commons.query.Filter.NoFilter
 import commons.query.Sort.{Ascending, Descending, NoSort}
 import commons.query.{Filter, Sort}
 import commons.spec.CollectionGenerators.{nDistinct, nDistinctExcluding}
 import commons.spec.PostgresSuite
+import commons.spec.RangeGenerators.rangeDoubleGen
 
 import cats.implicits.{toFoldableOps, toTraverseOps}
 import org.scalacheck.Gen
@@ -51,9 +53,10 @@ object ClothingRepositorySuite:
     ids <- nDistinct(size, idGen)
     garments <- ids.traverse(id => garmentGen(id))
     expected = garments.map: garment =>
-      val priceInEur = garment.price.in(euroContext.defaultCurrency)
-      val rounded = priceInEur.amount.setScale(5, BigDecimal.RoundingMode.HALF_UP)
-      garment.copy(price = euroContext.defaultCurrency(rounded))
+      val roundedPrice = garment.price
+        .in(euroContext.defaultCurrency)
+        .map(amount => BigDecimal(amount).setScale(5, BigDecimal.RoundingMode.HALF_UP).doubleValue)
+      garment.copy(price = roundedPrice)
   yield TestCase(garments, NoFilter, NoSort, expected)
 
   private val filterAndSortTestCaseGen = for
@@ -64,11 +67,14 @@ object ClothingRepositorySuite:
     otherCategories = Category.values.toList.diff(selectedCategories)
     selectedColors <- nDistinct(3, colorGen)
     otherColors = Color.values.toList.diff(selectedColors)
+    priceRange <- rangeDoubleGen(10d, 1_000d)
     selectedGarments <- selectedIds.traverse(id =>
       garmentGen(
         idGen = id,
         categoryGen = Gen.oneOf(selectedCategories),
         colorGen = Gen.oneOf(selectedColors),
+        priceGen =
+          Gen.choose(priceRange.start, priceRange.end).map(euroContext.defaultCurrency.apply),
       ),
     )
     otherGarments <- otherIds.traverse(id =>
@@ -76,19 +82,29 @@ object ClothingRepositorySuite:
         idGen = id,
         categoryGen = Gen.oneOf(otherCategories),
         colorGen = Gen.oneOf(otherColors),
+        priceGen = Gen.frequency(
+          1 -> Gen.choose(1d, priceRange.start - 1d).map(euroContext.defaultCurrency.apply),
+          1 -> Gen.choose(priceRange.end + 1d, 2_000d).map(euroContext.defaultCurrency.apply),
+        ),
       ),
     )
     garments = Random.shuffle(selectedGarments ++ otherGarments)
-    filter = And(In(selectedCategories*), In(selectedColors*))
+    filter = And(
+      In(selectedCategories*),
+      In(selectedColors*),
+      Between(priceRange.map(euroContext.defaultCurrency.apply)),
+    )
     sort <- Gen.oneOf(Ascending(sortablePrice), Descending(sortablePrice))
-    pricesInEur = selectedGarments
+    roundedUnits = selectedGarments
       .map: garment =>
-        val priceInEur = garment.price.in(euroContext.defaultCurrency)
-        val rounded = priceInEur.amount.setScale(5, BigDecimal.RoundingMode.HALF_UP)
-        garment.copy(price = euroContext.defaultCurrency(rounded))
-      .sortBy(_.price.amount)
+        val roundedPrice = garment.price
+          .in(euroContext.defaultCurrency)
+          .map(amount =>
+            BigDecimal(amount).setScale(5, BigDecimal.RoundingMode.HALF_UP).doubleValue,
+          )
+        garment.copy(price = roundedPrice)
     expected = sort match
-      case Ascending(sortable) => pricesInEur.sortBy(_.price.amount)
-      case Descending(sortable) => pricesInEur.sortBy(_.price.amount).reverse
-      case NoSort => pricesInEur
+      case Ascending(sortable) => roundedUnits.sortBy(_.price.amount)
+      case Descending(sortable) => roundedUnits.sortBy(_.price.amount).reverse
+      case NoSort => roundedUnits
   yield TestCase(garments, filter, sort, expected)

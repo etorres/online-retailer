@@ -1,7 +1,7 @@
 package es.eriktorr
 package clothing
 
-import clothing.Garment.Image
+import commons.market.EuroMoneyContext
 import commons.market.EuroMoneyContext.euroContext
 import commons.spec.CollectionGenerators.nDistinct
 import commons.spec.StringGenerators.alphaNumericStringBetween
@@ -15,14 +15,16 @@ object GarmentGenerators:
   val categoryGen: Gen[Category] = Gen.oneOf(Category.values.toList)
 
   val modelGen: Gen[Garment.Model] = alphaNumericStringBetween(3, 5).map(Garment.Model.applyUnsafe)
+
   val sizeGen: Gen[Size] = Gen.oneOf(Size.values.toList)
 
   val colorGen: Gen[Color] = Gen.oneOf(Color.values.toList)
 
-  val priceGen: Gen[Money] = for
+  val priceGen: Gen[Money] = (for
     amount <- Gen.choose(1d, 1000d)
     currency <- Gen.oneOf(euroContext.currencies)
-  yield Money(amount, currency)
+  yield Money(amount, currency))
+    .retryUntil(_.in(euroContext.defaultCurrency) <= EuroMoneyContext.max)
 
   val descriptionGen: Gen[Garment.Description] =
     alphaNumericStringBetween(5, 7).map(Garment.Description.applyUnsafe)
@@ -32,7 +34,7 @@ object GarmentGenerators:
     extension <- Gen.oneOf("jpg", "png")
   yield Garment.Image.applyUnsafe(s"$filename.$extension")
 
-  val imagesGen: Gen[List[Image]] = for
+  val imagesGen: Gen[List[Garment.Image]] = for
     size <- Gen.choose(1, 3)
     images <- nDistinct(size, imageGen)
   yield images
