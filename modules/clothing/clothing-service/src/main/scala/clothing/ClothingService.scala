@@ -22,6 +22,9 @@ import doobie.Put
 import fs2.Stream
 import io.grpc.{Metadata, ServerServiceDefinition}
 import org.typelevel.log4cats.Logger
+import io.github.arainko.ducktape.*
+
+import scala.util.Try
 
 final class ClothingService(clothingRepository: ClothingRepository, chunkSize: Int)(using
     logger: Logger[IO],
@@ -55,7 +58,8 @@ final class ClothingService(clothingRepository: ClothingRepository, chunkSize: I
           searchTerm.field match
             case SearchTermField.Category => searchTermFrom(searchTerm, Category.option, "category")
             case SearchTermField.Model => searchTermFrom(searchTerm, Garment.Model.option, "model")
-            case SearchTermField.Size => searchTermFrom(searchTerm, Size.option, "size")
+            case SearchTermField.Size =>
+              searchTermFrom(searchTerm, x => Try(x.to[Size]).toOption, "size")
             case SearchTermField.Color => searchTermFrom(searchTerm, Color.option, "color")
             case SearchTermField.Unrecognized(unrecognizedValue) =>
               warnAndIgnore(
