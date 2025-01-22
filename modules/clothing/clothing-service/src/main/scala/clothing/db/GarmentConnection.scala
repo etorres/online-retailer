@@ -11,6 +11,7 @@ import doobie.implicits.given
 import doobie.postgres.implicits.given
 import doobie.util.fragments.parentheses
 import doobie.{ConnectionIO, Meta}
+import fs2.Stream
 import squants.Money
 
 sealed private trait GarmentConnection:
@@ -63,10 +64,10 @@ object GarmentConnection extends GarmentConnection:
   private val columns = columnsFr(allColumns)
 
   @SuppressWarnings(Array("org.wartremover.warts.Any"))
-  def findGarmentsBy(filter: Filter, sort: Sort): ConnectionIO[List[Garment]] =
+  def selectGarmentsBy(filter: Filter, sort: Sort, chunkSize: Int): Stream[ConnectionIO, Garment] =
     val select = fr"SELECT" ++ columns ++ fr"FROM" ++ table
     val sql = select ++ where(filter) ++ orderBy(sort)
-    sql.query[Garment].to[List]
+    sql.query[Garment].streamWithChunkSize(chunkSize)
 
   def insert(garment: Garment): ConnectionIO[Int] =
     val sql = fr"INSERT INTO" ++ table ++ parentheses(columns) ++ fr"VALUES" ++ parentheses(

@@ -28,7 +28,7 @@ object ClothingServiceApp
     _ <- (for
       transactor <- JdbcTransactor(config.jdbcConfig).resource
       clothingRepository = ClothingRepository.Postgres(transactor)
-      clothingService <- ClothingService.resource(clothingRepository)
+      clothingService <- ClothingService.resource(clothingRepository, chunkSize = 512)
     yield clothingService).use: clothingService =>
       GrpcServer
         .runServer(clothingService, config.grpcConfig)

@@ -9,12 +9,23 @@ import commons.query.{Filter, Sort}
 import cats.effect.IO
 import doobie.hikari.HikariTransactor
 import doobie.implicits.given
+import fs2.Stream
 
 trait ClothingRepository:
-  def findGarmentsBy(filter: Filter, sort: Sort): IO[List[Garment]]
+  def selectGarmentsBy(
+      filter: Filter,
+      sort: Sort,
+      chunkSize: Int = ClothingRepository.defaultChunkSize,
+  ): Stream[IO, Garment]
 
 object ClothingRepository:
+  private val defaultChunkSize = doobie.util.query.DefaultChunkSize
+
   final class Postgres(transactor: HikariTransactor[IO]) extends ClothingRepository:
-    override def findGarmentsBy(filter: Filter, sort: Sort): IO[List[Garment]] =
-      val connection = GarmentConnection.findGarmentsBy(filter, sort)
+    override def selectGarmentsBy(
+        filter: Filter,
+        sort: Sort,
+        chunkSize: Int = defaultChunkSize,
+    ): Stream[IO, Garment] =
+      val connection = GarmentConnection.selectGarmentsBy(filter, sort, chunkSize)
       connection.transact(transactor).map(_.unRow)

@@ -23,19 +23,23 @@ import fs2.Stream
 import io.grpc.{Metadata, ServerServiceDefinition}
 import org.typelevel.log4cats.Logger
 
-final class ClothingService(clothingRepository: ClothingRepository)(using logger: Logger[IO])
-    extends ClothingFs2Grpc[IO, Metadata]:
+final class ClothingService(clothingRepository: ClothingRepository, chunkSize: Int)(using
+    logger: Logger[IO],
+) extends ClothingFs2Grpc[IO, Metadata]:
   override def sendClothingStream(
       request: Stream[IO, ClothingRequest],
       context: Metadata,
-  ): Stream[IO, ClothingReply] = request.evalMap: clothingRequest =>
+  ): Stream[IO, ClothingReply] = request.flatMap: clothingRequest =>
     for
       filter <- filterFrom(clothingRequest)
       sort <- sortFrom(clothingRequest)
-      garments <- clothingRepository.findGarmentsBy(filter, sort)
+      garments <- clothingRepository
+        .selectGarmentsBy(filter, sort, chunkSize)
+        .chunkMin(chunkSize, allowFewerTotal = true)
+        .map(_.toList)
     yield ClothingReply(garments.wire)
 
-  private def filterFrom(clothingRequest: ClothingRequest) =
+  private def filterFrom(clothingRequest: ClothingRequest): Stream[IO, Filter] =
     clothingRequest.filter
       .traverse: filterRequest =>
         for
@@ -44,25 +48,27 @@ final class ClothingService(clothingRepository: ClothingRepository)(using logger
         yield And(searchTerms ++ priceRange*)
       .map(_.getOrElse(NoFilter))
 
-  private def searchTermsFrom(filterRequest: ClothingRequest.Filter) =
-    filterRequest.searchTerms
-      .traverse: searchTerm =>
-        searchTerm.field match
-          case SearchTermField.Category => searchTermFrom(searchTerm, Category.option, "category")
-          case SearchTermField.Model => searchTermFrom(searchTerm, Garment.Model.option, "model")
-          case SearchTermField.Size => searchTermFrom(searchTerm, Size.option, "size")
-          case SearchTermField.Color => searchTermFrom(searchTerm, Color.option, "color")
-          case SearchTermField.Unrecognized(unrecognizedValue) =>
-            warnAndIgnore(
-              s"Ignoring unsupported search term $unrecognizedValue, with values: ${searchTerm.values.mkString("[", ",", "]")}",
-            )
-      .map(_.collect { case Some(value) => value })
+  private def searchTermsFrom(filterRequest: ClothingRequest.Filter): Stream[IO, Seq[Filter]] =
+    Stream.eval(
+      filterRequest.searchTerms
+        .traverse: searchTerm =>
+          searchTerm.field match
+            case SearchTermField.Category => searchTermFrom(searchTerm, Category.option, "category")
+            case SearchTermField.Model => searchTermFrom(searchTerm, Garment.Model.option, "model")
+            case SearchTermField.Size => searchTermFrom(searchTerm, Size.option, "size")
+            case SearchTermField.Color => searchTermFrom(searchTerm, Color.option, "color")
+            case SearchTermField.Unrecognized(unrecognizedValue) =>
+              warnAndIgnore(
+                s"Ignoring unsupported search term $unrecognizedValue, with values: ${searchTerm.values.mkString("[", ",", "]")}",
+              )
+        .map(_.collect { case Some(value) => value }),
+    )
 
   private def searchTermFrom[T: Filterable: Put](
       searchTerm: ClothingRequest.Filter.SearchTerm,
       mapper: String => Option[T],
       name: String,
-  ) =
+  ): IO[In[T]] =
     searchTerm.values
       .traverse: value =>
         mapper(value) match
@@ -71,14 +77,8 @@ final class ClothingService(clothingRepository: ClothingRepository)(using logger
       .map: values =>
         In(values.collect { case Some(value) => value }*)
 
-  private def priceRangeFrom(filterRequest: ClothingRequest.Filter) =
-    filterRequest.priceRange
-      .map: priceRange =>
-        List(Between(Range(priceRange.min, priceRange.max)))
-      .getOrElse(List.empty)
-
-  private def sortFrom(clothingRequest: ClothingRequest) =
-    for
+  private def sortFrom(clothingRequest: ClothingRequest): Stream[IO, Sort] =
+    Stream.eval(for
       maybeSort <- clothingRequest.sort
         .flatTraverse: sortRequest =>
           (sortRequest.field match
@@ -93,12 +93,18 @@ final class ClothingService(clothingRepository: ClothingRepository)(using logger
                 OptionT(warnAndIgnore(s"Ignoring unsupported sort order: $unrecognizedValue"))
           .value
       sort = maybeSort.getOrElse(NoSort)
-    yield sort
+    yield sort)
+
+  private def priceRangeFrom(filterRequest: ClothingRequest.Filter): List[Filter] =
+    filterRequest.priceRange
+      .map: priceRange =>
+        List(Between(Range(priceRange.min, priceRange.max)))
+      .getOrElse(List.empty)
 
   private def warnAndIgnore[A](message: String) = logger.warn(message) *> IO.none[A]
 
 object ClothingService:
-  def resource(clothingRepository: ClothingRepository)(using
+  def resource(clothingRepository: ClothingRepository, chunkSize: Int)(using
       logger: Logger[IO],
   ): Resource[IO, ServerServiceDefinition] =
-    ClothingFs2Grpc.bindServiceResource[IO](ClothingService(clothingRepository))
+    ClothingFs2Grpc.bindServiceResource[IO](ClothingService(clothingRepository, chunkSize))
