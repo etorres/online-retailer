@@ -13,7 +13,7 @@ trait ProtobufWires:
         .into[protobuf.Garment]
         .transform(
           Field.computed(_.sku, _.sku),
-          Field.computed(_.size, size => s"T_$size"),
+          Field.computed(_.size, x => s"T_${x.size}"),
           Field.computed(_.category, _.category.toString),
           Field.computed(_.color, _.color.toString),
           Field.default(_.unknownFields),
