@@ -3,7 +3,7 @@ package electronics.db
 
 import commons.query.Row.row
 import electronics.db.ElectronicDevice.given
-import electronics.{db, ElectronicDevice}
+import electronics.ElectronicDevice
 
 import cats.effect.IO
 import doobie.hikari.HikariTransactor

@@ -1,0 +1,65 @@
+syntax = "proto3";
+
+package es.eriktorr.stock;
+
+import "scalapb/scalapb.proto";
+
+option (scalapb.options) = {
+  import: "es.eriktorr.stock.given"
+};
+
+message StockAvailability {
+  int64 sku = 1;
+  string name = 2;
+  string category = 3;
+  int32 quantity = 4;
+  string unit_price = 5 [(scalapb.field).type = "squants.market.Money"];
+  int32 reorder_level = 6;
+}
+
+message StockRequest {
+  message Filter {
+    message SearchTerm {
+      enum Field {
+        Category = 0;
+      };
+
+      Field field = 1;
+      repeated string values = 2;
+    }
+
+    message QuantityRange {
+      int32 min = 1;
+      int32 max = 2;
+    }
+
+    repeated SearchTerm search_terms = 1;
+    QuantityRange quantity_range = 2;
+  }
+
+  message Sort {
+    enum Field {
+      Category = 0;
+      Quantity = 1;
+    };
+
+    enum Order {
+      Ascending = 0;
+      Descending = 1;
+    };
+
+    Field field = 1;
+    Order order = 2;
+  }
+
+  optional Filter filter = 1;
+  optional Sort sort = 2;
+}
+
+message StockReply {
+  repeated StockAvailability stock_availabilities = 1;
+}
+
+service Stock {
+  rpc SendStockStream (stream StockRequest) returns (stream StockReply) {}
+}

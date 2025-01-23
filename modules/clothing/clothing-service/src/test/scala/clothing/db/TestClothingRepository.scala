@@ -2,7 +2,7 @@ package es.eriktorr
 package clothing.db
 
 import clothing.db.Garment.given
-import clothing.{db, Garment}
+import clothing.Garment
 import commons.query.Row.row
 
 import cats.effect.IO

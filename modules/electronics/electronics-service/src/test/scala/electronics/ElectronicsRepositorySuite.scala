@@ -36,14 +36,14 @@ final class ElectronicsRepositorySuite extends PostgresSuite:
 
   private def testWith(testCaseGen: Gen[TestCase]) =
     forAllF(testCaseGen):
-      case TestCase(electronicDevices, filter, sort, expected) =>
+      case TestCase(electronicDevices, filter, sort, expected, diff) =>
         testTransactor.resource.use: transactor =>
           val testElectronicsRepository = TestElectronicsRepository(transactor)
           val testee = ElectronicsRepository.Postgres(transactor)
           (for
             _ <- electronicDevices.traverse_(testElectronicsRepository.add)
             obtained <- testee.selectElectronicDevicesBy(filter, sort).compile.toList
-          yield obtained).assertEquals(expected)
+          yield diff(obtained)).assertEquals(diff(expected))
 
 object ElectronicsRepositorySuite:
   final private case class TestCase(
@@ -51,7 +51,10 @@ object ElectronicsRepositorySuite:
       filter: Filter,
       sort: Sort,
       expected: List[ElectronicDevice],
+      diff: List[ElectronicDevice] => List[ElectronicDevice],
   )
+
+  private val sortById = (xs: List[ElectronicDevice]) => xs.sortBy(_.id)
 
   private val selectAllTestCaseGen = for
     size <- Gen.choose(3, 5)
@@ -65,7 +68,7 @@ object ElectronicsRepositorySuite:
         .in(euroContext.defaultCurrency)
         .map(amount => BigDecimal(amount).setScale(5, BigDecimal.RoundingMode.HALF_UP).doubleValue)
       electronicDevice.copy(powerConsumption = roundedPower, price = roundedPrice)
-  yield TestCase(electronicDevices, NoFilter, NoSort, expected)
+  yield TestCase(electronicDevices, NoFilter, NoSort, expected, sortById)
 
   private val filterAndSortTestCaseGen = for
     size <- Gen.choose(3, 5)
@@ -86,10 +89,12 @@ object ElectronicsRepositorySuite:
       electronicDeviceGen(
         idGen = id,
         categoryGen = Gen.oneOf(otherCategories),
-        priceGen = Gen.frequency(
-          1 -> Gen.choose(1d, priceRange.start - 1d).map(euroContext.defaultCurrency.apply),
-          1 -> Gen.choose(priceRange.end + 1d, 2_000d).map(euroContext.defaultCurrency.apply),
-        ),
+        priceGen = Gen
+          .frequency(
+            1 -> Gen.choose(1d, priceRange.start - 1d),
+            1 -> Gen.choose(priceRange.end + 1d, 2_000d),
+          )
+          .map(euroContext.defaultCurrency.apply),
       ),
     )
     electronicDevices = Random.shuffle(selectedElectronicDevices ++ otherElectronicDevices)
@@ -122,4 +127,5 @@ object ElectronicsRepositorySuite:
           price = roundedPrice,
         )
     expected = sortingFunction(roundedUnits)
-  yield TestCase(electronicDevices, filter, sort, expected)
+    diff = if sort == NoSort then sortById else identity[List[ElectronicDevice]]
+  yield TestCase(electronicDevices, filter, sort, expected, diff)

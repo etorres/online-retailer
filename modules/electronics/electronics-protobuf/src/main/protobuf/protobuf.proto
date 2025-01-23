@@ -29,17 +29,17 @@ message ElectronicsRequest {
 
       Field field = 1;
       repeated string values = 2;
-    };
+    }
 
     message PriceRange {
       string min = 1 [(scalapb.field).type = "squants.market.Money"];
       string max = 2 [(scalapb.field).type = "squants.market.Money"];
-    };
+    }
 
     message PowerConsumptionRange {
       string min = 1 [(scalapb.field).type = "squants.energy.Power"];
       string max = 2 [(scalapb.field).type = "squants.energy.Power"];
-    };
+    }
 
     repeated SearchTerm search_terms = 1;
     PriceRange price_range = 2;

@@ -258,14 +258,6 @@ lazy val `electronics-service` = project
   )
   .enablePlugins(JavaAppPackaging)
 
-lazy val `inventory-dsl` = project
-  .in(file("modules/inventory/inventory-dsl"))
-  .configure(withBaseSettings)
-  .settings(
-    libraryDependencies ++= Seq(),
-  )
-  .dependsOn(`commons-lang` % "test->test;compile->compile")
-
 lazy val `product-search` = project
   .in(file("modules/products/product-search"))
   .configure(withBaseSettings)
@@ -274,6 +266,72 @@ lazy val `product-search` = project
     Universal / maintainer := "https://github.com/etorres/online-retailer",
   )
   .dependsOn(`clothing-client`)
+  .enablePlugins(JavaAppPackaging)
+
+lazy val `stock-client` = project
+  .in(file("modules/stock/stock-client"))
+  .configure(withBaseSettings)
+  .settings(
+    libraryDependencies ++= Seq(),
+  )
+  .dependsOn(
+    `commons-grpc`,
+    `stock-dsl` % "test->test;compile->compile",
+    `stock-protobuf`,
+  )
+
+lazy val `stock-dsl` = project
+  .in(file("modules/stock/stock-dsl"))
+  .configure(withBaseSettings)
+  .settings(
+    libraryDependencies ++= Seq(
+      "io.github.iltotore" %% "iron" % "2.6.0",
+      "io.hypersistence" % "hypersistence-tsid" % "2.1.3",
+      "org.typelevel" %% "cats-core" % "2.13.0",
+      "org.typelevel" %% "cats-effect" % "3.5.7",
+      "org.typelevel" %% "squants" % "1.8.3",
+    ),
+  )
+  .dependsOn(`commons-lang` % "test->test;compile->compile")
+
+lazy val `stock-protobuf` = project
+  .in(file("modules/stock/stock-protobuf"))
+  .configure(usingProtobuf)
+  .settings(
+    libraryDependencies ++= Seq(
+      "io.github.arainko" %% "ducktape" % "0.2.7",
+      "com.thesamet.scalapb" %% "scalapb-runtime" % scalapb.compiler.Version.scalapbVersion % "protobuf",
+      "org.typelevel" %% "squants" % "1.8.3",
+    ),
+  )
+  .dependsOn(
+    `commons-grpc`,
+    `stock-dsl` % "test->test;compile->compile",
+  )
+  .enablePlugins(Fs2Grpc)
+
+lazy val `stock-service` = project
+  .in(file("modules/stock/stock-service"))
+  .configure(withBaseSettings)
+  .settings(
+    libraryDependencies ++= Seq(
+      "com.lmax" % "disruptor" % "3.4.4" % Runtime,
+      "com.monovore" %% "decline-effect" % "2.5.0",
+      "org.apache.logging.log4j" % "log4j-core" % "2.24.3" % Runtime,
+      "org.apache.logging.log4j" % "log4j-layout-template-json" % "2.24.3" % Runtime,
+      "org.apache.logging.log4j" % "log4j-slf4j2-impl" % "2.24.3" % Runtime,
+      "org.typelevel" %% "cats-core" % "2.13.0",
+      "org.typelevel" %% "cats-effect" % "3.5.7",
+      "org.typelevel" %% "log4cats-slf4j" % "2.7.0",
+    ),
+    Universal / maintainer := "https://github.com/etorres/online-retailer",
+  )
+  .dependsOn(
+    `commons-database` % "test->test;compile->compile",
+    `commons-grpc` % "test->test;compile->compile",
+    `stock-dsl` % "test->test;compile->compile",
+    `stock-protobuf`,
+  )
   .enablePlugins(JavaAppPackaging)
 
 lazy val root = project
@@ -290,8 +348,11 @@ lazy val root = project
     `electronics-dsl`,
     `electronics-protobuf`,
     `electronics-service`,
-    `inventory-dsl`,
     `product-search`,
+    `stock-client`,
+    `stock-dsl`,
+    `stock-protobuf`,
+    `stock-service`,
   )
   .settings(
     name := "online-retailer",

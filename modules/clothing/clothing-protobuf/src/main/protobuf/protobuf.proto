@@ -32,12 +32,12 @@ message ClothingRequest {
 
       Field field = 1;
       repeated string values = 2;
-    };
+    }
 
     message PriceRange {
       string min = 1 [(scalapb.field).type = "squants.market.Money"];
       string max = 2 [(scalapb.field).type = "squants.market.Money"];
-    };
+    }
 
     repeated SearchTerm search_terms = 1;
     PriceRange price_range = 2;

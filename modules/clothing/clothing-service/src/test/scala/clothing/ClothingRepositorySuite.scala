@@ -31,14 +31,14 @@ final class ClothingRepositorySuite extends PostgresSuite:
 
   private def testWith(testCaseGen: Gen[TestCase]) =
     forAllF(testCaseGen):
-      case TestCase(garments, filter, sort, expected) =>
+      case TestCase(garments, filter, sort, expected, diff) =>
         testTransactor.resource.use: transactor =>
           val testClothingRepository = TestClothingRepository(transactor)
           val testee = ClothingRepository.Postgres(transactor)
           (for
             _ <- garments.traverse_(testClothingRepository.add)
             obtained <- testee.selectGarmentsBy(filter, sort).compile.toList
-          yield obtained).assertEquals(expected)
+          yield diff(obtained)).assertEquals(diff(expected))
 
 object ClothingRepositorySuite:
   final private case class TestCase(
@@ -46,7 +46,10 @@ object ClothingRepositorySuite:
       filter: Filter,
       sort: Sort,
       expected: List[Garment],
+      diff: List[Garment] => List[Garment],
   )
+
+  private val sortById = (xs: List[Garment]) => xs.sortBy(_.id)
 
   private val selectAllTestCaseGen = for
     size <- Gen.choose(3, 5)
@@ -57,7 +60,7 @@ object ClothingRepositorySuite:
         .in(euroContext.defaultCurrency)
         .map(amount => BigDecimal(amount).setScale(5, BigDecimal.RoundingMode.HALF_UP).doubleValue)
       garment.copy(price = roundedPrice)
-  yield TestCase(garments, NoFilter, NoSort, expected)
+  yield TestCase(garments, NoFilter, NoSort, expected, sortById)
 
   private val filterAndSortTestCaseGen = for
     size <- Gen.choose(3, 5)
@@ -107,4 +110,5 @@ object ClothingRepositorySuite:
       case Ascending(sortable) => roundedUnits.sortBy(_.price.amount)
       case Descending(sortable) => roundedUnits.sortBy(_.price.amount).reverse
       case NoSort => roundedUnits
-  yield TestCase(garments, filter, sort, expected)
+    diff = if sort == NoSort then sortById else identity[List[Garment]]
+  yield TestCase(garments, filter, sort, expected, diff)
