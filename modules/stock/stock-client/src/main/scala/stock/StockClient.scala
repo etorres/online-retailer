@@ -12,15 +12,22 @@ import cats.effect.kernel.Resource
 import fs2.Stream
 import io.grpc.Metadata
 
-final class StockClient(grpcConfig: GrpcConfig):
-  def findStockAvailabilitiesBy(request: Stream[IO, StockRequest]): IO[List[StockAvailability]] =
-    resource.use: service =>
-      (for
-        response <- service.sendStockStream(request, Metadata())
-        garments = response.stockAvailabilities.toList.unWire
-      yield garments).compile.lastOrError
+trait StockClient:
+  def findStockAvailabilitiesBy(request: StockRequest): IO[List[StockAvailability]]
 
-  private def resource: Resource[IO, StockFs2Grpc[IO, Metadata]] =
-    GrpcClient
-      .managedChannelResource(grpcConfig)
-      .flatMap(channel => StockFs2Grpc.stubResource[IO](channel))
+object StockClient:
+  final class Grpc(grpcConfig: GrpcConfig) extends StockClient:
+    override def findStockAvailabilitiesBy(request: StockRequest): IO[List[StockAvailability]] =
+      resource.use: service =>
+        (for
+          response <- service.sendStockStream(
+            Stream.emit(request).covary[IO],
+            Metadata(),
+          )
+          garments = response.stockAvailabilities.toList.unWire
+        yield garments).compile.lastOrError
+
+    private def resource: Resource[IO, StockFs2Grpc[IO, Metadata]] =
+      GrpcClient
+        .managedChannelResource(grpcConfig)
+        .flatMap(channel => StockFs2Grpc.stubResource[IO](channel))

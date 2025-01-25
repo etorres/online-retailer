@@ -4,6 +4,7 @@ ThisBuild / idePackagePrefix := Some("es.eriktorr")
 Global / excludeLintKeys += idePackagePrefix
 
 ThisBuild / scalaVersion := "3.3.4"
+ThisBuild / resolvers += "Confluent Maven Repository" at "https://packages.confluent.io/maven/"
 
 ThisBuild / semanticdbEnabled := true
 ThisBuild / javacOptions ++= Seq("-source", "21", "-target", "21")
@@ -29,7 +30,7 @@ lazy val withBaseSettings: Project => Project = _.settings(
     "org.apache.logging.log4j" % "log4j-core" % "2.24.3" % Test,
     "org.apache.logging.log4j" % "log4j-layout-template-json" % "2.24.3" % Test,
     "org.apache.logging.log4j" % "log4j-slf4j2-impl" % "2.24.3" % Test,
-    "org.scalameta" %% "munit" % "1.0.4" % Test,
+    "org.scalameta" %% "munit" % "1.1.0" % Test,
     "org.scalameta" %% "munit-scalacheck" % "1.0.0" % Test,
     "org.typelevel" %% "munit-cats-effect" % "2.0.0" % Test,
     "org.typelevel" %% "scalacheck-effect" % "1.0.4" % Test,
@@ -262,10 +263,24 @@ lazy val `product-search` = project
   .in(file("modules/products/product-search"))
   .configure(withBaseSettings)
   .settings(
-    libraryDependencies ++= Seq(),
+    libraryDependencies ++= Seq(
+//      "com.evolution" %% "scache" % "5.1.2" exclude ("org.slf4j", "slf4j-api"),
+//      "com.evolutiongaming" %% "cats-helper" % "3.11.0" exclude ("org.slf4j", "slf4j-api"),
+//      "com.evolutiongaming" %% "smetrics" % "2.2.0" exclude ("org.slf4j", "slf4j-api"),
+      "com.github.ghostdogpr" %% "caliban-quick" % "2.9.1",
+      "dev.zio" %% "zio-interop-cats" % "23.1.0.3",
+      "io.github.iltotore" %% "iron" % "2.6.0",
+      "org.typelevel" %% "cats-core" % "2.13.0",
+      "org.typelevel" %% "cats-effect" % "3.5.7",
+      "org.typelevel" %% "squants" % "1.8.3",
+    ),
     Universal / maintainer := "https://github.com/etorres/online-retailer",
   )
-  .dependsOn(`clothing-client`)
+  .dependsOn(
+//    `clothing-client` % "test->test;compile->compile",
+//    `electronics-client` % "test->test;compile->compile",
+    `stock-client` % "test->test;compile->compile",
+  )
   .enablePlugins(JavaAppPackaging)
 
 lazy val `stock-client` = project

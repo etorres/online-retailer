@@ -1,5 +1,6 @@
 addDependencyTreePlugin
 addSbtPlugin("ch.epfl.scala" % "sbt-scalafix" % "0.14.0")
+addSbtPlugin("com.evolution" % "sbt-artifactory-plugin" % "0.0.2")
 addSbtPlugin("com.github.cb372" % "sbt-explicit-dependencies" % "0.3.1")
 addSbtPlugin("com.github.sbt" % "sbt-native-packager" % "1.11.0")
 addSbtPlugin("org.jetbrains.scala" % "sbt-ide-settings" % "1.1.2")

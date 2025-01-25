@@ -12,15 +12,22 @@ import cats.effect.kernel.Resource
 import fs2.Stream
 import io.grpc.Metadata
 
-final class ElectronicsClient(grpcConfig: GrpcConfig):
-  def findGarmentsBy(request: Stream[IO, ElectronicsRequest]): IO[List[ElectronicDevice]] =
-    resource.use: service =>
-      (for
-        response <- service.sendElectronicsStream(request, Metadata())
-        garments = response.electronicDevices.toList.unWire
-      yield garments).compile.lastOrError
+trait ElectronicsClient:
+  def findGarmentsBy(request: ElectronicsRequest): IO[List[ElectronicDevice]]
 
-  private def resource: Resource[IO, ElectronicsFs2Grpc[IO, Metadata]] =
-    GrpcClient
-      .managedChannelResource(grpcConfig)
-      .flatMap(channel => ElectronicsFs2Grpc.stubResource[IO](channel))
+object ElectronicsClient:
+  final class Grpc(grpcConfig: GrpcConfig) extends ElectronicsClient:
+    override def findGarmentsBy(request: ElectronicsRequest): IO[List[ElectronicDevice]] =
+      resource.use: service =>
+        (for
+          response <- service.sendElectronicsStream(
+            Stream.emit(request).covary[IO],
+            Metadata(),
+          )
+          electronicDevices = response.electronicDevices.toList.unWire
+        yield electronicDevices).compile.lastOrError
+
+    private def resource: Resource[IO, ElectronicsFs2Grpc[IO, Metadata]] =
+      GrpcClient
+        .managedChannelResource(grpcConfig)
+        .flatMap(channel => ElectronicsFs2Grpc.stubResource[IO](channel))
