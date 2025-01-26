@@ -9,6 +9,7 @@ import caliban.wrappers.Wrappers.*
 import caliban.wrappers.{Caching, IncrementalDelivery}
 import zio.{durationInt, ZIO, ZLayer}
 
+@SuppressWarnings(Array("org.wartremover.warts.Any"))
 object ProductApi:
   private def makeApi(productService: ProductService) =
     graphQL(

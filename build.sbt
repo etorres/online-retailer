@@ -44,6 +44,7 @@ lazy val withBaseSettings: Project => Project = _.settings(
     "ONLINE_RETAILER_JDBC_USERNAME" -> "online_retailer_username",
     "ONLINE_RETAILER_GRPC_HOST" -> "grpc.test",
     "ONLINE_RETAILER_GRPC_PORT" -> "1234",
+    "ONLINE_RETAILER_GRAPHQL_PORT" -> "5678",
     "TSID_NODE" -> "1",
   ),
   Test / testFrameworks += MUnitFramework,
@@ -65,6 +66,16 @@ lazy val usingProtobuf: Project => Project = withBaseSettings.compose(
 lazy val usingDoobie: Project => Project = withBaseSettings.compose(
   _.settings(
     unusedCompileDependenciesFilter -= moduleFilter("org.tpolecat", "doobie-postgres"),
+  ),
+)
+
+lazy val usingSCache: Project => Project = withBaseSettings.compose(
+  _.settings(
+    libraryDependencies ++= Seq(
+      "com.evolution" %% "scache" % "5.1.2" exclude ("org.slf4j", "slf4j-api"),
+      "com.evolutiongaming" %% "cats-helper" % "3.11.0" exclude ("org.slf4j", "slf4j-api"),
+      "com.evolutiongaming" %% "smetrics" % "2.2.0" exclude ("org.slf4j", "slf4j-api"),
+    ),
   ),
 )
 
@@ -264,21 +275,14 @@ lazy val `product-search` = project
   .configure(withBaseSettings)
   .settings(
     libraryDependencies ++= Seq(
-//      "com.evolution" %% "scache" % "5.1.2" exclude ("org.slf4j", "slf4j-api"),
-//      "com.evolutiongaming" %% "cats-helper" % "3.11.0" exclude ("org.slf4j", "slf4j-api"),
-//      "com.evolutiongaming" %% "smetrics" % "2.2.0" exclude ("org.slf4j", "slf4j-api"),
       "com.github.ghostdogpr" %% "caliban-quick" % "2.9.1",
       "dev.zio" %% "zio-interop-cats" % "23.1.0.3",
-      "io.github.iltotore" %% "iron" % "2.6.0",
-      "org.typelevel" %% "cats-core" % "2.13.0",
-      "org.typelevel" %% "cats-effect" % "3.5.7",
-      "org.typelevel" %% "squants" % "1.8.3",
     ),
     Universal / maintainer := "https://github.com/etorres/online-retailer",
   )
   .dependsOn(
-//    `clothing-client` % "test->test;compile->compile",
-//    `electronics-client` % "test->test;compile->compile",
+    `clothing-client` % "test->test;compile->compile",
+    `electronics-client` % "test->test;compile->compile",
     `stock-client` % "test->test;compile->compile",
   )
   .enablePlugins(JavaAppPackaging)

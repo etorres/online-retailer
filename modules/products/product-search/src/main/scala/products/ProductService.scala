@@ -16,6 +16,7 @@ trait ProductService:
   ): Task[List[Product]]
   def productById(id: Long): Task[Option[Product]]
 
+@SuppressWarnings(Array("org.wartremover.warts.Any"))
 object ProductService:
   def make(grpcConfig: GrpcConfig): ZLayer[Any, Throwable, ProductService] =
     (for
