@@ -7,7 +7,7 @@ import electronics.protobuf.ElectronicsRequest
 import cats.effect.{IO, Ref}
 
 final class FakeElectronicsClient(stateRef: Ref[IO, ElectronicsClientState])
-    extends ElectronicsClient:
+    extends ElectronicsClient[IO]:
   override def findGarmentsBy(request: ElectronicsRequest): IO[List[ElectronicDevice]] =
     stateRef.get.map(_.electronicDevices)
 

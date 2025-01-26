@@ -12,9 +12,21 @@ final class ProductSuite extends FunSuite:
     fail("not implemented")
 
 /*
-    """query {
-                                       |  product(id: 100) {
-                                       |    category
-                                       |  }
-                                       |}""".stripMargin
+query GetProductCategory {
+	product(id: 100) {
+		__typename
+		... on ElectronicDevice {
+			category
+		}
+		... on Garment {
+			category
+		}
+	}
+}
+ */
+
+/*
+    caliban.CalibanError$ValidationError:
+    Filter of InputValue 'filters' of Field 'products' of Object 'Queries' is of kind UNION,
+    must be an InputType"
  */

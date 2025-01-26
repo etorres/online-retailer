@@ -7,27 +7,29 @@ import commons.api.GrpcClient
 import commons.api.Wire.unWire
 import commons.application.GrpcConfig
 
-import cats.effect.IO
-import cats.effect.kernel.Resource
+import cats.effect.{Async, Resource}
 import fs2.Stream
 import io.grpc.Metadata
 
-trait ClothingClient:
-  def findGarmentsBy(request: ClothingRequest): IO[List[Garment]]
+trait ClothingClient[F[_]: Async]:
+  def findGarmentsBy(request: ClothingRequest): F[List[Garment]]
 
 object ClothingClient:
-  final class Grpc(grpcConfig: GrpcConfig) extends ClothingClient:
-    override def findGarmentsBy(request: ClothingRequest): IO[List[Garment]] =
-      resource.use: service =>
-        (for
-          response <- service.sendClothingStream(
-            Stream.emit(request).covary[IO],
-            Metadata(),
-          )
-          garments = response.garments.toList.unWire
-        yield garments).compile.lastOrError
+  final class Grpc[F[_]: Async](clothingStub: ClothingFs2Grpc[F, Metadata])
+      extends ClothingClient[F]:
+    override def findGarmentsBy(request: ClothingRequest): F[List[Garment]] =
+      (for
+        response <- clothingStub.sendClothingStream(
+          Stream.emit(request).covary[F],
+          Metadata(),
+        )
+        garments = response.garments.toList.unWire
+      yield garments).compile.lastOrError
 
-    private def resource: Resource[IO, ClothingFs2Grpc[IO, Metadata]] =
-      GrpcClient
+  def resource[F[_]: Async](grpcConfig: GrpcConfig): Resource[F, Grpc[F]] =
+    for
+      clothingStub <- GrpcClient
         .managedChannelResource(grpcConfig)
-        .flatMap(channel => ClothingFs2Grpc.stubResource[IO](channel))
+        .flatMap(channel => ClothingFs2Grpc.stubResource[F](channel))
+      clothingClient = Grpc(clothingStub)
+    yield clothingClient

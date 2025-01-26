@@ -7,27 +7,28 @@ import commons.application.GrpcConfig
 import stock.ProtobufWires.given
 import stock.protobuf.{StockFs2Grpc, StockRequest}
 
-import cats.effect.IO
-import cats.effect.kernel.Resource
+import cats.effect.{Async, Resource}
 import fs2.Stream
 import io.grpc.Metadata
 
-trait StockClient:
-  def findStockAvailabilitiesBy(request: StockRequest): IO[List[StockAvailability]]
+trait StockClient[F[_]: Async]:
+  def findStockAvailabilitiesBy(request: StockRequest): F[List[StockAvailability]]
 
 object StockClient:
-  final class Grpc(grpcConfig: GrpcConfig) extends StockClient:
-    override def findStockAvailabilitiesBy(request: StockRequest): IO[List[StockAvailability]] =
-      resource.use: service =>
-        (for
-          response <- service.sendStockStream(
-            Stream.emit(request).covary[IO],
-            Metadata(),
-          )
-          garments = response.stockAvailabilities.toList.unWire
-        yield garments).compile.lastOrError
+  final class Grpc[F[_]: Async](stockStub: StockFs2Grpc[F, Metadata]) extends StockClient[F]:
+    override def findStockAvailabilitiesBy(request: StockRequest): F[List[StockAvailability]] =
+      (for
+        response <- stockStub.sendStockStream(
+          Stream.emit(request).covary[F],
+          Metadata(),
+        )
+        garments = response.stockAvailabilities.toList.unWire
+      yield garments).compile.lastOrError
 
-    private def resource: Resource[IO, StockFs2Grpc[IO, Metadata]] =
-      GrpcClient
+  def resource[F[_]: Async](grpcConfig: GrpcConfig): Resource[F, Grpc[F]] =
+    for
+      stockStub <- GrpcClient
         .managedChannelResource(grpcConfig)
-        .flatMap(channel => StockFs2Grpc.stubResource[IO](channel))
+        .flatMap(channel => StockFs2Grpc.stubResource[F](channel))
+      stockClient = Grpc(stockStub)
+    yield stockClient

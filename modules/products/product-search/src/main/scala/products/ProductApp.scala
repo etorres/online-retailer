@@ -3,6 +3,7 @@ package products
 
 import caliban.*
 import caliban.quick.*
+import es.eriktorr.commons.application.GrpcConfig
 import zio.*
 
 object ProductApp extends ZIOAppDefault:
@@ -16,21 +17,8 @@ object ProductApp extends ZIOAppDefault:
         )
       }
       .provide(
-        ProductService.make(???),
+        ProductService.make(GrpcConfig(GrpcConfig.defaultHost, GrpcConfig.defaultPort)),
         ProductApi.layer,
       )
 
   override def run: ZIO[Any, Throwable, Unit] = serve
-
-/*
-package es.eriktorr
-package products
-
-import products.Product.Queries
-
-import caliban.render
-
-object DeleteMe:
-  def main(args: Array[String]): Unit =
-    println(render[Queries])
-*/

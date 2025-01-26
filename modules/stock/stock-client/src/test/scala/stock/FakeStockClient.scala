@@ -6,7 +6,7 @@ import stock.protobuf.StockRequest
 
 import cats.effect.{IO, Ref}
 
-final class FakeStockClient(stateRef: Ref[IO, StockClientState]) extends StockClient:
+final class FakeStockClient(stateRef: Ref[IO, StockClientState]) extends StockClient[IO]:
   override def findStockAvailabilitiesBy(request: StockRequest): IO[List[StockAvailability]] =
     stateRef.get.map(_.stockAvailabilities)
 

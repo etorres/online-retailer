@@ -3,7 +3,7 @@ package products
 
 import caliban.schema.Annotations.{GQLDefault, GQLDescription}
 import caliban.schema.{ArgBuilder, Schema}
-import zio.UIO
+import zio.Task
 
 import java.time.LocalDate
 
@@ -69,32 +69,32 @@ object Product:
       images: List[String],
   ) extends Product derives Schema.SemiAuto
 
-  sealed trait Filter derives Schema.SemiAuto, ArgBuilder
-
-  object Filter:
-    final case class Range(field: String, min: Double, max: Double) extends Filter
-        derives Schema.SemiAuto,
-          ArgBuilder
-
-    final case class SearchTerm(field: String, values: List[String]) extends Filter
-        derives Schema.SemiAuto,
-          ArgBuilder
-
-  sealed trait Sort derives Schema.SemiAuto, ArgBuilder:
-    val field: String
-
-  object Sort:
-    final case class Ascending(field: String) extends Sort derives Schema.SemiAuto, ArgBuilder
-    final case class Descending(field: String) extends Sort derives Schema.SemiAuto, ArgBuilder
-
-  final case class ProductsArgs(filters: List[Filter], sort: Option[Sort])
+  final case class SearchTerm(field: String, values: List[String])
       derives Schema.SemiAuto,
         ArgBuilder
+
+  final case class Range(field: String, min: Double, max: Double)
+      derives Schema.SemiAuto,
+        ArgBuilder
+
+  sealed trait Order derives Schema.SemiAuto, ArgBuilder
+
+  object Order:
+    case object Ascending extends Order derives Schema.SemiAuto, ArgBuilder
+    case object Descending extends Order derives Schema.SemiAuto, ArgBuilder
+
+  final case class Sort(field: String) derives Schema.SemiAuto, ArgBuilder
+
+  final case class Lookup(searchTerms: List[SearchTerm], ranges: List[Range], sort: Option[Sort])
+      derives Schema.SemiAuto,
+        ArgBuilder
+
+  final case class ProductsArgs(lookup: Lookup) derives Schema.SemiAuto, ArgBuilder
   final case class ProductArgs(id: Long) derives Schema.SemiAuto, ArgBuilder
 
   final case class Queries(
       @GQLDescription("Returns all products that match the given filter")
-      products: ProductsArgs => UIO[List[Product]],
+      products: ProductsArgs => Task[List[Product]],
       @GQLDescription("Find the product by its id")
-      product: ProductArgs => UIO[Option[Product]],
+      product: ProductArgs => Task[Option[Product]],
   ) derives Schema.SemiAuto

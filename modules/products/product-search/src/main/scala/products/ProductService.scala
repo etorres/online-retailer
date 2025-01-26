@@ -1,23 +1,34 @@
 package es.eriktorr
 package products
 
-import products.Product.{Filter, Sort}
+import commons.application.GrpcConfig
+import products.Product.{Range, SearchTerm, Sort}
 import stock.StockClient
 
-import zio.{UIO, ZIO, ZLayer}
-//import zio.interop.catz.*
+import zio.interop.catz.*
+import zio.{Task, ZIO, ZLayer}
 
 trait ProductService:
-  def findProductsBy(filters: List[Filter], sort: Option[Sort]): UIO[List[Product]]
-  def productById(id: Long): UIO[Option[Product]]
+  def findProductsBy(
+      searchTerms: List[SearchTerm],
+      ranges: List[Range],
+      sort: Option[Sort],
+  ): Task[List[Product]]
+  def productById(id: Long): Task[Option[Product]]
 
 object ProductService:
-  def make(stockClient: StockClient): ZLayer[Any, Nothing, ProductService] =
-    ZLayer.succeed(new ProductService:
-      override def findProductsBy(filters: List[Filter], sort: Option[Sort]): UIO[List[Product]] =
-//        stockClient.findStockAvailabilitiesBy[zio.Task](???)
-        ???
+  def make(grpcConfig: GrpcConfig): ZLayer[Any, Throwable, ProductService] =
+    (for
+      stockClient <- StockClient.resource[zio.Task](grpcConfig).toManagedZIO
+      productService = new ProductService:
+        override def findProductsBy(
+            searchTerms: List[SearchTerm],
+            ranges: List[Range],
+            sort: Option[Sort],
+        ): Task[List[Product]] =
+          ZIO.succeed(List.empty)
+        override def productById(id: Long): Task[Option[Product]] =
+          ZIO.succeed(None)
+    yield productService).toLayer
 
-      override def productById(id: Long): UIO[Option[Product]] =
-        ZIO.succeed(None), // TODO
-    )
+// stockClient.findStockAvailabilitiesBy(???)

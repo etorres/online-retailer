@@ -14,7 +14,12 @@ object ProductApi:
     graphQL(
       RootResolver(
         Queries(
-          products = args => productService.findProductsBy(args.filters, args.sort),
+          products = args =>
+            productService.findProductsBy(
+              args.lookup.searchTerms,
+              args.lookup.ranges,
+              args.lookup.sort,
+            ),
           product = args => productService.productById(args.id),
         ),
       ),
