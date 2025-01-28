@@ -1,12 +1,13 @@
 package es.eriktorr
 package products
 
-import caliban.schema.Annotations.{GQLDefault, GQLDescription}
+import caliban.schema.Annotations.{GQLDefault, GQLDescription, GQLInterface}
 import caliban.schema.{ArgBuilder, Schema}
 import zio.Task
 
 import java.time.LocalDate
 
+@GQLInterface
 sealed trait Product derives Schema.SemiAuto:
   val id: Long
   val category: String
@@ -83,7 +84,7 @@ object Product:
     case object Ascending extends Order derives Schema.SemiAuto, ArgBuilder
     case object Descending extends Order derives Schema.SemiAuto, ArgBuilder
 
-  final case class Sort(field: String) derives Schema.SemiAuto, ArgBuilder
+  final case class Sort(field: String, order: Order) derives Schema.SemiAuto, ArgBuilder
 
   final case class Lookup(searchTerms: List[SearchTerm], ranges: List[Range], sort: Option[Sort])
       derives Schema.SemiAuto,

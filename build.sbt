@@ -277,6 +277,8 @@ lazy val `product-search` = project
     libraryDependencies ++= Seq(
       "com.github.ghostdogpr" %% "caliban-quick" % "2.9.1",
       "dev.zio" %% "zio-interop-cats" % "23.1.0.3",
+      "org.typelevel" %% "cats-core" % "2.13.0",
+      "org.typelevel" %% "cats-effect" % "3.5.7",
     ),
     Universal / maintainer := "https://github.com/etorres/online-retailer",
   )

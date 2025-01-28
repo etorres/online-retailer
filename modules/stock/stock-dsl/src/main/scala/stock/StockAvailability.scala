@@ -18,7 +18,8 @@ final case class StockAvailability(
     quantity: StockAvailability.Quantity,
     unitPrice: Money,
     reorderLevel: StockAvailability.ReorderLevel,
-)
+):
+  def isAvailable: Boolean = quantity >= reorderLevel
 
 object StockAvailability:
   opaque type SKU <: Long :| Positive0 = Long :| Positive0

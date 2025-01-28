@@ -14,19 +14,15 @@ final class ProductSuite extends FunSuite:
 /*
 query GetProductCategory {
 	product(id: 100) {
+		category
 		__typename
 		... on ElectronicDevice {
-			category
+			powerConsumption
 		}
 		... on Garment {
-			category
+			color
+			size
 		}
 	}
 }
- */
-
-/*
-    caliban.CalibanError$ValidationError:
-    Filter of InputValue 'filters' of Field 'products' of Object 'Queries' is of kind UNION,
-    must be an InputType"
  */

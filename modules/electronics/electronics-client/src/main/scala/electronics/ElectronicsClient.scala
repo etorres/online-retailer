@@ -12,12 +12,12 @@ import fs2.Stream
 import io.grpc.Metadata
 
 trait ElectronicsClient[F[_]: Async]:
-  def findGarmentsBy(request: ElectronicsRequest): F[List[ElectronicDevice]]
+  def findElectronicDevicesBy(request: ElectronicsRequest): F[List[ElectronicDevice]]
 
 object ElectronicsClient:
   final class Grpc[F[_]: Async](electronicsStub: ElectronicsFs2Grpc[F, Metadata])
       extends ElectronicsClient[F]:
-    override def findGarmentsBy(request: ElectronicsRequest): F[List[ElectronicDevice]] =
+    override def findElectronicDevicesBy(request: ElectronicsRequest): F[List[ElectronicDevice]] =
       (for
         response <- electronicsStub.sendElectronicsStream(
           Stream.emit(request).covary[F],
