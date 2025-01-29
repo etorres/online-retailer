@@ -1,11 +1,18 @@
 package es.eriktorr
 package clothing
 
+import clothing.Garment as DomainGarment
 import clothing.ProtobufWires.given
 import clothing.db.GarmentConnection.{sortablePrice, given}
 import clothing.protobuf.ClothingRequest.Filter.SearchTerm.Field as SearchTermField
 import clothing.protobuf.ClothingRequest.Sort.{Field as SortField, Order as SortOrder}
-import clothing.protobuf.{ClothingFs2Grpc, ClothingReply, ClothingRequest}
+import clothing.protobuf.{
+  ClothingFs2Grpc,
+  ClothingReply,
+  ClothingRequest,
+  GetGarmentReply,
+  GetGarmentRequest,
+}
 import commons.api.Wire.wire
 import commons.query.Column.Filterable
 import commons.query.Filter.Combinator.{And, In}
@@ -20,15 +27,26 @@ import cats.effect.{IO, Resource}
 import cats.implicits.toTraverseOps
 import doobie.Put
 import fs2.Stream
+import io.github.arainko.ducktape.*
 import io.grpc.{Metadata, ServerServiceDefinition}
 import org.typelevel.log4cats.Logger
-import io.github.arainko.ducktape.*
 
 import scala.util.Try
 
 final class ClothingService(clothingRepository: ClothingRepository, chunkSize: Int)(using
     logger: Logger[IO],
 ) extends ClothingFs2Grpc[IO, Metadata]:
+  override def getGarment(
+      request: Stream[IO, GetGarmentRequest],
+      context: Metadata,
+  ): Stream[IO, GetGarmentReply] =
+    for
+      getGarmentRequest <- request
+      maybeGarment <- Stream.eval(
+        clothingRepository.findGarmentBy(Garment.Id.applyUnsafe(getGarmentRequest.sku)).value,
+      )
+    yield GetGarmentReply(maybeGarment.wire)
+
   override def sendClothingStream(
       request: Stream[IO, ClothingRequest],
       context: Metadata,
@@ -57,7 +75,8 @@ final class ClothingService(clothingRepository: ClothingRepository, chunkSize: I
         .traverse: searchTerm =>
           searchTerm.field match
             case SearchTermField.Category => searchTermFrom(searchTerm, Category.option, "category")
-            case SearchTermField.Model => searchTermFrom(searchTerm, Garment.Model.option, "model")
+            case SearchTermField.Model =>
+              searchTermFrom(searchTerm, DomainGarment.Model.option, "model")
             case SearchTermField.Size =>
               searchTermFrom(searchTerm, x => Try(x.to[Size]).toOption, "size")
             case SearchTermField.Color => searchTermFrom(searchTerm, Color.option, "color")

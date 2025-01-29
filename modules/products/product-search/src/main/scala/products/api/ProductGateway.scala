@@ -1,7 +1,7 @@
 package es.eriktorr
 package products.api
 
-import clothing.protobuf.ClothingRequest
+import clothing.protobuf.{ClothingRequest, GetGarmentRequest}
 import clothing.{ClothingClient, Garment}
 import commons.application.GrpcConfig
 import commons.market.EuroMoneyContext.given
@@ -110,7 +110,10 @@ object ProductGateway:
           .toList
       yield electronicDevicesProducts ++ garmentProducts
 
-    override def productById(id: Long): F[Option[Product]] = ???
+    override def productById(id: Long): F[Option[Product]] =
+      val maybeGarment = clothingClient.getGarment(GetGarmentRequest(id)).value
+      assert(maybeGarment == maybeGarment) // TODO
+      ???
 
     private def electronicsRequestFrom(
         searchTerms: List[SearchTerm],

@@ -6,12 +6,14 @@ import clothing.db.GarmentConnection
 import commons.query.Row.unRow
 import commons.query.{Filter, Sort}
 
+import cats.data.OptionT
 import cats.effect.IO
 import doobie.hikari.HikariTransactor
 import doobie.implicits.given
 import fs2.Stream
 
 trait ClothingRepository:
+  def findGarmentBy(id: Garment.Id): OptionT[IO, Garment]
   def selectGarmentsBy(
       filter: Filter,
       sort: Sort,
@@ -22,6 +24,10 @@ object ClothingRepository:
   private val defaultChunkSize = doobie.util.query.DefaultChunkSize
 
   final class Postgres(transactor: HikariTransactor[IO]) extends ClothingRepository:
+    override def findGarmentBy(id: Garment.Id): OptionT[IO, Garment] =
+      val connection = GarmentConnection.findGarmentBy(id)
+      OptionT(connection.transact(transactor).map(_.unRow))
+
     override def selectGarmentsBy(
         filter: Filter,
         sort: Sort,

@@ -20,6 +20,14 @@ message Garment {
   reserved 100 to 200;
 }
 
+message GetGarmentRequest {
+  int64 sku = 1;
+}
+
+message GetGarmentReply {
+  optional Garment garment = 1;
+}
+
 message ClothingRequest {
   message Filter {
     message SearchTerm {
@@ -66,5 +74,6 @@ message ClothingReply {
 }
 
 service Clothing {
+  rpc GetGarment (stream GetGarmentRequest) returns (stream GetGarmentReply) {}
   rpc SendClothingStream (stream ClothingRequest) returns (stream ClothingReply) {}
 }

@@ -27,3 +27,13 @@ object Row:
     def unRow[A](using transformer: FromRow[B, A]): List[A] =
       self.map: b =>
         transformer.unRow(b)
+
+  extension [A](self: Option[A])
+    def row[B](using transformer: ToRow[A, B]): Option[B] =
+      self.map: a =>
+        transformer.row(a)
+
+  extension [B](self: Option[B])
+    def unRow[A](using transformer: FromRow[B, A]): Option[A] =
+      self.map: b =>
+        transformer.unRow(b)

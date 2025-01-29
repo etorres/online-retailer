@@ -1,13 +1,18 @@
 package es.eriktorr
 package clothing
 
-import clothing.ClothingRepositorySuite.{filterAndSortTestCaseGen, selectAllTestCaseGen, TestCase}
+import clothing.ClothingRepositorySuite.{
+  filterAndSortTestCaseGen,
+  findGarmentByIdTestCaseGen,
+  selectAllTestCaseGen,
+  TestCase,
+}
 import clothing.GarmentGenerators.{categoryGen, colorGen, garmentGen, idGen}
 import clothing.db.GarmentConnection.{sortablePrice, given}
 import clothing.db.TestClothingRepository
 import commons.market.EuroMoneyContext.given
 import commons.query.Filter.Combinator.{And, In}
-import commons.query.Filter.Comparator.Between
+import commons.query.Filter.Comparator.{Between, Equal}
 import commons.query.Filter.NoFilter
 import commons.query.Sort.{Ascending, Descending, NoSort}
 import commons.query.{Filter, Sort}
@@ -15,6 +20,7 @@ import commons.spec.CollectionGenerators.{nDistinct, nDistinctExcluding}
 import commons.spec.PostgresSuite
 import commons.spec.RangeGenerators.rangeDoubleGen
 
+import cats.effect.IO
 import cats.implicits.{toFoldableOps, toTraverseOps}
 import org.scalacheck.Gen
 import org.scalacheck.cats.implicits.given
@@ -23,13 +29,28 @@ import org.scalacheck.effect.PropF.forAllF
 import scala.util.Random
 
 final class ClothingRepositorySuite extends PostgresSuite:
+  test("should find a garment by its id"):
+    testWith(
+      findGarmentByIdTestCaseGen,
+      (testee, filter, _) => testee.findGarmentBy(filter.to).value,
+    )
+
   test("should list all garments"):
-    testWith(selectAllTestCaseGen)
+    testWith(
+      selectAllTestCaseGen,
+      (testee, filter, sort) => testee.selectGarmentsBy(filter, sort).compile.toList,
+    )
 
   test("should filter and sort garments"):
-    testWith(filterAndSortTestCaseGen)
+    testWith(
+      filterAndSortTestCaseGen,
+      (testee, filter, sort) => testee.selectGarmentsBy(filter, sort).compile.toList,
+    )
 
-  private def testWith(testCaseGen: Gen[TestCase]) =
+  private def testWith[A, B <: Filter](
+      testCaseGen: Gen[TestCase[A, B]],
+      run: (ClothingRepository, B, Sort) => IO[A],
+  ) =
     forAllF(testCaseGen):
       case TestCase(garments, filter, sort, expected, diff) =>
         testTransactor.resource.use: transactor =>
@@ -37,29 +58,46 @@ final class ClothingRepositorySuite extends PostgresSuite:
           val testee = ClothingRepository.Postgres(transactor)
           (for
             _ <- garments.traverse_(testClothingRepository.add)
-            obtained <- testee.selectGarmentsBy(filter, sort).compile.toList
+            obtained <- run(testee, filter, sort)
           yield diff(obtained)).assertEquals(diff(expected))
 
 object ClothingRepositorySuite:
-  final private case class TestCase(
+  final private case class TestCase[A, B <: Filter](
       garments: List[Garment],
-      filter: Filter,
+      filter: B,
       sort: Sort,
-      expected: List[Garment],
-      diff: List[Garment] => List[Garment],
+      expected: A,
+      diff: A => A,
   )
 
   private val sortById = (xs: List[Garment]) => xs.sortBy(_.id)
+
+  private val priceToEur = (garment: Garment) =>
+    val roundedPrice = garment.price
+      .in(euroContext.defaultCurrency)
+      .map(amount => BigDecimal(amount).setScale(5, BigDecimal.RoundingMode.HALF_UP).doubleValue)
+    garment.copy(price = roundedPrice)
+
+  private val findGarmentByIdTestCaseGen = for
+    selectedId <- idGen
+    selectedGarment <- garmentGen(selectedId)
+    size <- Gen.choose(3, 5)
+    otherIds <- nDistinctExcluding(size, idGen, Set(selectedId))
+    otherGarments <- otherIds.traverse(id => garmentGen(id))
+    expected = Option(selectedGarment).map(priceToEur)
+  yield TestCase(
+    selectedGarment :: otherGarments,
+    Equal(selectedId),
+    NoSort,
+    expected,
+    identity,
+  )
 
   private val selectAllTestCaseGen = for
     size <- Gen.choose(3, 5)
     ids <- nDistinct(size, idGen)
     garments <- ids.traverse(id => garmentGen(id))
-    expected = garments.map: garment =>
-      val roundedPrice = garment.price
-        .in(euroContext.defaultCurrency)
-        .map(amount => BigDecimal(amount).setScale(5, BigDecimal.RoundingMode.HALF_UP).doubleValue)
-      garment.copy(price = roundedPrice)
+    expected = garments.map(priceToEur)
   yield TestCase(garments, NoFilter, NoSort, expected, sortById)
 
   private val filterAndSortTestCaseGen = for
@@ -98,14 +136,7 @@ object ClothingRepositorySuite:
       Between(priceRange.map(euroContext.defaultCurrency.apply)),
     )
     sort <- Gen.oneOf(Ascending(sortablePrice), Descending(sortablePrice))
-    roundedUnits = selectedGarments
-      .map: garment =>
-        val roundedPrice = garment.price
-          .in(euroContext.defaultCurrency)
-          .map(amount =>
-            BigDecimal(amount).setScale(5, BigDecimal.RoundingMode.HALF_UP).doubleValue,
-          )
-        garment.copy(price = roundedPrice)
+    roundedUnits = selectedGarments.map(priceToEur)
     expected = sort match
       case Ascending(sortable) => roundedUnits.sortBy(_.price.amount)
       case Descending(sortable) => roundedUnits.sortBy(_.price.amount).reverse

@@ -4,11 +4,17 @@ package electronics
 import commons.query.{Filter, Sort}
 import electronics.FakeElectronicsRepository.ElectronicsRepositoryState
 
+import cats.data.OptionT
 import cats.effect.{IO, Ref}
 import fs2.Stream
 
 final class FakeElectronicsRepository(stateRef: Ref[IO, ElectronicsRepositoryState])
     extends ElectronicsRepository:
+  override def findElectronicDeviceBy(id: ElectronicDevice.Id): OptionT[IO, ElectronicDevice] =
+    OptionT(
+      stateRef.get.map(_.electronicDevices.find(_.id == id)),
+    )
+
   override def selectElectronicDevicesBy(
       filter: Filter,
       sort: Sort,

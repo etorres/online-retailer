@@ -12,7 +12,13 @@ import electronics.ProtobufWires.given
 import electronics.db.ElectronicDeviceConnection.given
 import electronics.protobuf.ElectronicsRequest.Filter.SearchTerm.Field as SearchTermField
 import electronics.protobuf.ElectronicsRequest.Sort.{Field as SortField, Order as SortOrder}
-import electronics.protobuf.{ElectronicsFs2Grpc, ElectronicsReply, ElectronicsRequest}
+import electronics.protobuf.{
+  ElectronicsFs2Grpc,
+  ElectronicsReply,
+  ElectronicsRequest,
+  GetElectronicDeviceReply,
+  GetElectronicDeviceRequest,
+}
 
 import cats.collections.Range
 import cats.data.OptionT
@@ -26,6 +32,19 @@ import org.typelevel.log4cats.Logger
 final class ElectronicsService(electronicsRepository: ElectronicsRepository, chunkSize: Int)(using
     logger: Logger[IO],
 ) extends ElectronicsFs2Grpc[IO, Metadata]:
+  override def getElectronicDevice(
+      request: Stream[IO, GetElectronicDeviceRequest],
+      context: Metadata,
+  ): Stream[IO, GetElectronicDeviceReply] =
+    for
+      getElectronicDeviceRequest <- request
+      maybeElectronicDevice <- Stream.eval(
+        electronicsRepository
+          .findElectronicDeviceBy(ElectronicDevice.Id.applyUnsafe(getElectronicDeviceRequest.sku))
+          .value,
+      )
+    yield GetElectronicDeviceReply(maybeElectronicDevice.wire)
+
   override def sendElectronicsStream(
       request: Stream[IO, ElectronicsRequest],
       context: Metadata,

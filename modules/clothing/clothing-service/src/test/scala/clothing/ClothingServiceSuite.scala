@@ -38,6 +38,9 @@ final class ClothingServiceSuite extends CatsEffectSuite with ScalaCheckEffectSu
           finalState <- stateRef.get
         yield finalState -> obtained).assertEquals(initialState -> expected)
 
+  test("should find a garment by its id"):
+    fail("not implemented")
+
 object ClothingServiceSuite:
   final private case class TestCase(
       garments: List[Garment],

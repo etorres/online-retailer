@@ -38,6 +38,9 @@ final class ElectronicsServiceSuite extends CatsEffectSuite with ScalaCheckEffec
           finalState <- stateRef.get
         yield finalState -> obtained).assertEquals(initialState -> expected)
 
+  test("should find an electronic device by its id"):
+    fail("not implemented")
+
 object ElectronicsServiceSuite:
   final private case class TestCase(
       electronicDevices: List[ElectronicDevice],

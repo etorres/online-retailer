@@ -19,3 +19,13 @@ object Wire:
     def unWire[A](using transformer: FromWire[B, A]): List[A] =
       self.map: b =>
         transformer.unWire(b)
+
+  extension [A](self: Option[A])
+    def wire[B <: scalapb.GeneratedMessage](using transformer: ToWire[A, B]): Option[B] =
+      self.map: a =>
+        transformer.wire(a)
+
+  extension [B <: scalapb.GeneratedMessage](self: Option[B])
+    def unWire[A](using transformer: FromWire[B, A]): Option[A] =
+      self.map: b =>
+        transformer.unWire(b)

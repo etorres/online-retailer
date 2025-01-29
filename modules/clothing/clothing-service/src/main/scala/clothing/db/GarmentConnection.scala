@@ -4,6 +4,7 @@ package clothing.db
 import clothing.{Category, Color, Garment as DomainGarment, Size}
 import commons.market.EuroMoneyContext.given
 import commons.query.Column.*
+import commons.query.Filter.Comparator.Equal
 import commons.query.QueryBuilder.{columns as columnsFr, orderBy, where}
 import commons.query.{Column, Filter, Sort}
 
@@ -16,7 +17,7 @@ import squants.Money
 
 sealed private trait GarmentConnection:
   // Column definitions
-  private val idColumn = column[DomainGarment.Id]("id")
+  private val idColumn = filterable[DomainGarment.Id]("id")
   private val categoryColumn = filterable[Category]("category")
   private val modelColumn = filterable[DomainGarment.Model]("model")
   private val sizeColumn = filterable[Size]("size")
@@ -37,6 +38,7 @@ sealed private trait GarmentConnection:
   )
 
   // Filterable columns
+  given Filterable[DomainGarment.Id] = idColumn
   given Filterable[Category] = categoryColumn
   given Filterable[DomainGarment.Model] = modelColumn
   given Filterable[Size] = sizeColumn
@@ -62,6 +64,11 @@ object GarmentConnection extends GarmentConnection:
   private val table = fr"garments"
 
   private val columns = columnsFr(allColumns)
+
+  def findGarmentBy(id: DomainGarment.Id): ConnectionIO[Option[Garment]] =
+    val select = fr"SELECT" ++ columns ++ fr"FROM" ++ table
+    val sql = select ++ where(Equal(id))
+    sql.query[Garment].option
 
   @SuppressWarnings(Array("org.wartremover.warts.Any"))
   def selectGarmentsBy(filter: Filter, sort: Sort, chunkSize: Int): Stream[ConnectionIO, Garment] =

@@ -3,6 +3,7 @@ package electronics.db
 
 import commons.market.EuroMoneyContext.given
 import commons.query.Column.{column, filterable, filterableAndSortable, Filterable, Sortable}
+import commons.query.Filter.Comparator.Equal
 import commons.query.QueryBuilder.{columns as columnsFr, orderBy, where}
 import commons.query.{Column, Filter, Sort}
 import electronics.{Category, ElectronicDevice as DomainElectronicDevice}
@@ -17,7 +18,7 @@ import squants.{Money, Power}
 
 sealed private trait ElectronicDeviceConnection:
   // Column definitions
-  private val idColumn = column[DomainElectronicDevice.Id]("id")
+  private val idColumn = filterable[DomainElectronicDevice.Id]("id")
   private val categoryColumn = filterable[Category]("category")
   private val modelColumn = filterable[DomainElectronicDevice.Model]("model")
   private val powerConsumptionColumn = filterableAndSortable[Power]("power_consumption_in_watts")
@@ -36,6 +37,7 @@ sealed private trait ElectronicDeviceConnection:
   )
 
   // Filterable columns
+  given Filterable[DomainElectronicDevice.Id] = idColumn
   given Filterable[Category] = categoryColumn
   given Filterable[DomainElectronicDevice.Model] = modelColumn
   given Filterable[Power] = powerConsumptionColumn
@@ -62,6 +64,13 @@ object ElectronicDeviceConnection extends ElectronicDeviceConnection:
   private val table = fr"electronics"
 
   private val columns = columnsFr(allColumns)
+
+  def findElectronicDeviceBy(
+      id: DomainElectronicDevice.Id,
+  ): ConnectionIO[Option[ElectronicDevice]] =
+    val select = fr"SELECT" ++ columns ++ fr"FROM" ++ table
+    val sql = select ++ where(Equal(id))
+    sql.query[ElectronicDevice].option
 
   @SuppressWarnings(Array("org.wartremover.warts.Any"))
   def selectElectronicDevicesBy(

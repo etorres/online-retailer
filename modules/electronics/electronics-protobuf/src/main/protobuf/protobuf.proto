@@ -19,6 +19,14 @@ message ElectronicDevice {
   reserved 100 to 200;
 }
 
+message GetElectronicDeviceRequest {
+  int64 sku = 1;
+}
+
+message GetElectronicDeviceReply {
+  optional ElectronicDevice electronicDevice = 1;
+}
+
 message ElectronicsRequest {
   message Filter {
     message SearchTerm {
@@ -70,5 +78,6 @@ message ElectronicsReply {
 }
 
 service Electronics {
+  rpc GetElectronicDevice (stream GetElectronicDeviceRequest) returns (stream GetElectronicDeviceReply) {}
   rpc SendElectronicsStream (stream ElectronicsRequest) returns (stream ElectronicsReply) {}
 }

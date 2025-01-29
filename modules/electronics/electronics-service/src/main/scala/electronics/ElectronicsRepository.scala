@@ -5,12 +5,14 @@ import commons.query.Row.unRow
 import commons.query.{Filter, Sort}
 import electronics.db.ElectronicDeviceConnection
 
+import cats.data.OptionT
 import cats.effect.IO
 import doobie.hikari.HikariTransactor
 import doobie.implicits.*
 import fs2.Stream
 
 trait ElectronicsRepository:
+  def findElectronicDeviceBy(id: ElectronicDevice.Id): OptionT[IO, ElectronicDevice]
   def selectElectronicDevicesBy(
       filter: Filter,
       sort: Sort,
@@ -21,6 +23,10 @@ object ElectronicsRepository:
   private val defaultChunkSize = doobie.util.query.DefaultChunkSize
 
   final class Postgres(transactor: HikariTransactor[IO]) extends ElectronicsRepository:
+    override def findElectronicDeviceBy(id: ElectronicDevice.Id): OptionT[IO, ElectronicDevice] =
+      val connection = ElectronicDeviceConnection.findElectronicDeviceBy(id)
+      OptionT(connection.transact(transactor).map(_.unRow))
+
     override def selectElectronicDevicesBy(
         filter: Filter,
         sort: Sort,
