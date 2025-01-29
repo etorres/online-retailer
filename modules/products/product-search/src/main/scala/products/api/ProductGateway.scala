@@ -5,7 +5,7 @@ import clothing.protobuf.{ClothingRequest, GetGarmentRequest}
 import clothing.{ClothingClient, Garment}
 import commons.application.GrpcConfig
 import commons.market.EuroMoneyContext.given
-import electronics.protobuf.ElectronicsRequest
+import electronics.protobuf.{ElectronicsRequest, GetElectronicDeviceRequest}
 import electronics.{ElectronicDevice, ElectronicsClient}
 import products.Product
 import products.Product.{Currency, Order, PowerUnit, Range, SearchTerm, Sort}
@@ -14,7 +14,7 @@ import stock.{StockAvailability, StockClient}
 
 import cats.Parallel
 import cats.effect.{Async, Resource}
-import cats.implicits.{catsSyntaxTuple3Parallel, toFunctorOps}
+import cats.implicits.{catsSyntaxTuple2Parallel, catsSyntaxTuple3Parallel, toFunctorOps}
 import squants.energy.{BtusPerHour, Milliwatts, Watts}
 import squants.market.{EUR, GBP, USD}
 
@@ -58,28 +58,7 @@ object ProductGateway:
           )
           .intersectionWith[StockAvailability, Product](
             stockMap,
-            (sku, electronicDevice, _) =>
-              Product.ElectronicDevice(
-                sku,
-                electronicDevice.category.name,
-                electronicDevice.model,
-                args =>
-                  (args.powerUnit.getOrElse(PowerUnit.Watts) match
-                    case PowerUnit.BtusPerHour => electronicDevice.powerConsumption.in(BtusPerHour)
-                    case PowerUnit.Milliwatts => electronicDevice.powerConsumption.in(Milliwatts)
-                    case PowerUnit.Watts => electronicDevice.powerConsumption.in(Watts)
-                  ).value,
-                args =>
-                  (args.currency.getOrElse(Currency.EUR) match
-                    case Currency.EUR => electronicDevice.price.in(EUR)
-                    case Currency.GBP => electronicDevice.price.in(GBP)
-                    case Currency.USD => electronicDevice.price.in(USD)
-                  ).value,
-                defaultTax,
-                electronicDevice.description,
-                LocalDate.now(),
-                electronicDevice.images.map(_.value),
-              ),
+            (sku, electronicDevice, _) => productFrom(sku, electronicDevice),
           )
           .values
           .toList
@@ -87,33 +66,23 @@ object ProductGateway:
           .from[Garment](garments.map(x => x.id -> x))
           .intersectionWith[StockAvailability, Product](
             stockMap,
-            (sku, garment, _) =>
-              Product.Garment(
-                sku,
-                garment.category.name,
-                garment.model,
-                garment.size.toString,
-                garment.color.toString,
-                args =>
-                  (args.currency.getOrElse(Currency.EUR) match
-                    case Currency.EUR => garment.price.in(EUR)
-                    case Currency.GBP => garment.price.in(GBP)
-                    case Currency.USD => garment.price.in(USD)
-                  ).value,
-                defaultTax,
-                garment.description,
-                LocalDate.now(),
-                garment.images.map(_.value),
-              ),
+            (sku, garment, _) => productFrom(sku, garment),
           )
           .values
           .toList
       yield electronicDevicesProducts ++ garmentProducts
 
     override def productById(id: Long): F[Option[Product]] =
-      val maybeGarment = clothingClient.getGarment(GetGarmentRequest(id)).value
-      assert(maybeGarment == maybeGarment) // TODO
-      ???
+      for
+        result <- (
+          electronicsClient.getElectronicDevice(GetElectronicDeviceRequest(id)).value,
+          clothingClient.getGarment(GetGarmentRequest(id)).value,
+        ).parTupled
+        (maybeElectronicDevice, maybeGarment) = result
+        maybeProduct = maybeElectronicDevice
+          .map(productFrom(id, _))
+          .orElse(maybeGarment.map(productFrom(id, _)))
+      yield maybeProduct
 
     private def electronicsRequestFrom(
         searchTerms: List[SearchTerm],
@@ -228,6 +197,48 @@ object ProductGateway:
         )
       }
       StockRequest(Some(filter), sort)
+
+    private def productFrom(sku: Long, electronicDevice: ElectronicDevice) =
+      Product.ElectronicDevice(
+        sku,
+        electronicDevice.category.name,
+        electronicDevice.model,
+        args =>
+          (args.powerUnit.getOrElse(PowerUnit.Watts) match
+            case PowerUnit.BtusPerHour => electronicDevice.powerConsumption.in(BtusPerHour)
+            case PowerUnit.Milliwatts => electronicDevice.powerConsumption.in(Milliwatts)
+            case PowerUnit.Watts => electronicDevice.powerConsumption.in(Watts)
+          ).value,
+        args =>
+          (args.currency.getOrElse(Currency.EUR) match
+            case Currency.EUR => electronicDevice.price.in(EUR)
+            case Currency.GBP => electronicDevice.price.in(GBP)
+            case Currency.USD => electronicDevice.price.in(USD)
+          ).value,
+        defaultTax,
+        electronicDevice.description,
+        LocalDate.now(),
+        electronicDevice.images.map(_.value),
+      )
+
+    private def productFrom(sku: Long, garment: Garment) =
+      Product.Garment(
+        sku,
+        garment.category.name,
+        garment.model,
+        garment.size.toString,
+        garment.color.toString,
+        args =>
+          (args.currency.getOrElse(Currency.EUR) match
+            case Currency.EUR => garment.price.in(EUR)
+            case Currency.GBP => garment.price.in(GBP)
+            case Currency.USD => garment.price.in(USD)
+          ).value,
+        defaultTax,
+        garment.description,
+        LocalDate.now(),
+        garment.images.map(_.value),
+      )
 
   private lazy val defaultTax = 21d
 

@@ -65,6 +65,7 @@ object GarmentConnection extends GarmentConnection:
 
   private val columns = columnsFr(allColumns)
 
+  @SuppressWarnings(Array("org.wartremover.warts.Any"))
   def findGarmentBy(id: DomainGarment.Id): ConnectionIO[Option[Garment]] =
     val select = fr"SELECT" ++ columns ++ fr"FROM" ++ table
     val sql = select ++ where(Equal(id))

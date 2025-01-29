@@ -65,6 +65,7 @@ object ElectronicDeviceConnection extends ElectronicDeviceConnection:
 
   private val columns = columnsFr(allColumns)
 
+  @SuppressWarnings(Array("org.wartremover.warts.Any"))
   def findElectronicDeviceBy(
       id: DomainElectronicDevice.Id,
   ): ConnectionIO[Option[ElectronicDevice]] =
