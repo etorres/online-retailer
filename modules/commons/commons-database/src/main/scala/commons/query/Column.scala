@@ -3,7 +3,8 @@ package commons.query
 
 import com.softwaremill.tagging.*
 
-final class Column[T](val column: String)
+final class Column[A](val table: Table.Name, val column: String):
+  val fqn = s"$table.$column"
 
 object Column extends AnyTypeclassTaggingCompat:
   type FilterableTag
@@ -13,11 +14,20 @@ object Column extends AnyTypeclassTaggingCompat:
   type Sortable[A] = Column[A] @@ SortableTag
   type FilterableAndSortable[A] = Column[A] @@ FilterableTag @@ SortableTag
 
-  def column[A](name: String): Column[A] = Column[A](name)
+  enum ColumnFormatter:
+    case SimpleName, FullQualifiedName
+    def format[A](column: Column[A]): String =
+      this match
+        case ColumnFormatter.SimpleName => column.column
+        case ColumnFormatter.FullQualifiedName => column.fqn
 
-  def filterable[A](name: String): Filterable[A] = Column[A](name).taggedWith[FilterableTag]
+  def column[A](name: String)(using table: Table.Name): Column[A] = Column[A](table, name)
 
-  def sortable[A](name: String): Sortable[A] = Column[A](name).taggedWith[SortableTag]
+  def filterable[A](name: String)(using table: Table.Name): Filterable[A] =
+    Column[A](table, name).taggedWith[FilterableTag]
 
-  def filterableAndSortable[A](name: String): FilterableAndSortable[A] =
-    Column[A](name).taggedWith[FilterableTag].taggedWith[SortableTag]
+  def sortable[A](name: String)(using table: Table.Name): Sortable[A] =
+    Column[A](table, name).taggedWith[SortableTag]
+
+  def filterableAndSortable[A](name: String)(using table: Table.Name): FilterableAndSortable[A] =
+    Column[A](table, name).taggedWith[FilterableTag].taggedWith[SortableTag]

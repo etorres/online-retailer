@@ -8,6 +8,8 @@ import commons.query.Row
 import io.github.arainko.ducktape.*
 import squants.Money
 
+import java.time.LocalDate
+
 final case class Garment(
     id: DomainGarment.Id,
     category: Category,
@@ -15,7 +17,9 @@ final case class Garment(
     size: Size,
     color: Color,
     priceInEur: Money,
+    tax: DomainGarment.Tax,
     description: DomainGarment.Description,
+    launchDate: LocalDate,
     images: List[String],
 )
 

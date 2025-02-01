@@ -3,17 +3,19 @@ package stock.db
 
 import commons.market.EuroMoneyContext.given
 import commons.query.Column.{column, filterableAndSortable, Filterable, Sortable}
-import commons.query.QueryBuilder.{columns as columnsFr, orderBy, where}
-import commons.query.{Column, Filter, Sort}
+import commons.query.QueryBuilder.{comma, orderBy, where}
+import commons.query.{Column, Filter, Sort, Table}
 import stock.StockAvailability as DomainStockAvailability
 
+import com.softwaremill.tagging.*
 import doobie.implicits.*
-import doobie.util.fragments.parentheses
 import doobie.{ConnectionIO, Meta}
 import fs2.Stream
 import squants.Money
 
-sealed private trait StockAvailabilityConnection:
+object StockAvailabilityTable extends Table[StockAvailability]:
+  implicit override val name: Table.Name = "stock_availability".taggedWith[Table.TableNameTag]
+
   // Column definitions
   private val skuColumn = column[DomainStockAvailability.SKU]("sku")
   private val nameColumn = column[DomainStockAvailability.Name]("name")
@@ -22,13 +24,25 @@ sealed private trait StockAvailabilityConnection:
   private val unitPriceColumn = column[DomainStockAvailability.Quantity]("unit_price_in_eur")
   private val reorderLevelColumn = column[DomainStockAvailability.ReorderLevel]("reorder_level")
 
-  protected val allColumns: List[Column[?]] = List(
+  private val allColumns = List(
     skuColumn,
     nameColumn,
     categoryColumn,
     quantityColumn,
     unitPriceColumn,
     reorderLevelColumn,
+  )
+
+  override def read: List[Column[_]] = allColumns
+
+  override def write(stockAvailability: StockAvailability): Table.Write = Table.Write(
+    allColumns,
+    sql"""${stockAvailability.sku},
+         |${stockAvailability.name},
+         |${stockAvailability.category},
+         |${stockAvailability.quantity},
+         |${stockAvailability.unitPriceInEur},
+         |${stockAvailability.reorderLevel}""".stripMargin,
   )
 
   // Filterable columns
@@ -54,28 +68,16 @@ sealed private trait StockAvailabilityConnection:
   given Meta[DomainStockAvailability.ReorderLevel] =
     Meta[Int].tiemap(DomainStockAvailability.ReorderLevel.either)(_.value)
 
-object StockAvailabilityConnection extends StockAvailabilityConnection:
-  private val table = fr"stock_availability"
-
-  private val columns = columnsFr(allColumns)
-
   @SuppressWarnings(Array("org.wartremover.warts.Any"))
   def selectStockAvailabilitiesBy(
       filter: Filter,
       sort: Sort,
       chunkSize: Int,
   ): Stream[ConnectionIO, StockAvailability] =
-    val select = fr"SELECT" ++ columns ++ fr"FROM" ++ table
+    val select = fr"SELECT" ++ comma(read) ++ fr"FROM" ++ this.sql
     val sql = select ++ where(filter) ++ orderBy(sort)
     sql.query[StockAvailability].streamWithChunkSize(chunkSize)
 
   def insert(stockAvailability: StockAvailability): ConnectionIO[Int] =
-    val sql = fr"INSERT INTO" ++ table ++ parentheses(columns) ++ fr"VALUES" ++ parentheses(
-      sql"""${stockAvailability.sku},
-           |${stockAvailability.name},
-           |${stockAvailability.category},
-           |${stockAvailability.quantity},
-           |${stockAvailability.unitPriceInEur},
-           |${stockAvailability.reorderLevel}""".stripMargin,
-    )
+    val sql = fr"INSERT INTO" ++ this.sql ++ write(stockAvailability).sql
     sql.update.run

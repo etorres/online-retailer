@@ -9,7 +9,7 @@ import commons.query.Filter.NoFilter
 import commons.query.Sort.NoSort
 import commons.query.{Filter, Sort}
 import stock.ProtobufWires.given
-import stock.db.StockAvailabilityConnection.given
+import stock.db.StockAvailabilityTable.given
 import stock.protobuf.StockRequest.Filter.SearchTerm.Field as SearchTermField
 import stock.protobuf.StockRequest.Sort.{Field as SortField, Order as SortOrder}
 import stock.protobuf.{StockFs2Grpc, StockReply, StockRequest}

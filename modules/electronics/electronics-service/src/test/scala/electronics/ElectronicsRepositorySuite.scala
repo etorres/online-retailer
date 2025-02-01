@@ -1,6 +1,8 @@
 package es.eriktorr
 package electronics
 
+import commons.domain.DomainGenerators.salesTaxRowsGen
+import commons.domain.{SalesTax, SalesTaxRow, TestSalesTaxRepository}
 import commons.market.EuroMoneyContext.given
 import commons.query.Filter.Combinator.{And, In}
 import commons.query.Filter.Comparator.{Between, Equal}
@@ -10,14 +12,16 @@ import commons.query.{Filter, Sort}
 import commons.spec.CollectionGenerators.{nDistinct, nDistinctExcluding}
 import commons.spec.PostgresSuite
 import commons.spec.RangeGenerators.rangeDoubleGen
-import electronics.ElectronicDeviceGenerators.{categoryGen, electronicDeviceGen, idGen}
+import electronics.ElectronicDeviceGenerators.{categoryGen, idGen}
 import electronics.ElectronicsRepositorySuite.{
   filterAndSortTestCaseGen,
   findElectronicDeviceByIdTestCaseGen,
   selectAllTestCaseGen,
   TestCase,
 }
-import electronics.db.ElectronicDeviceConnection.given
+import electronics.db.ElectronicDeviceRow
+import electronics.db.ElectronicDeviceRowGenerators.electronicDeviceRowGen
+import electronics.db.ElectronicDeviceTable.given
 import electronics.db.TestElectronicsRepository
 
 import cats.effect.IO
@@ -53,18 +57,21 @@ final class ElectronicsRepositorySuite extends PostgresSuite:
       run: (ElectronicsRepository, B, Sort) => IO[A],
   ) =
     forAllF(testCaseGen):
-      case TestCase(electronicDevices, filter, sort, expected, diff) =>
+      case TestCase(salesTaxRows, electronicDeviceRows, filter, sort, expected, diff) =>
         testTransactor.resource.use: transactor =>
+          val testSalesTaxRepository = TestSalesTaxRepository(transactor)
           val testElectronicsRepository = TestElectronicsRepository(transactor)
           val testee = ElectronicsRepository.Postgres(transactor)
           (for
-            _ <- electronicDevices.traverse_(testElectronicsRepository.add)
+            _ <- salesTaxRows.traverse_(testSalesTaxRepository.add)
+            _ <- electronicDeviceRows.traverse_(testElectronicsRepository.add)
             obtained <- run(testee, filter, sort)
           yield diff(obtained)).assertEquals(diff(expected))
 
 object ElectronicsRepositorySuite:
   final private case class TestCase[A, B <: Filter](
-      electronicDevices: List[ElectronicDevice],
+      salesTaxRows: List[SalesTaxRow],
+      electronicDeviceRows: List[ElectronicDeviceRow],
       filter: B,
       sort: Sort,
       expected: A,
@@ -73,6 +80,15 @@ object ElectronicsRepositorySuite:
 
   private val sortById = (xs: List[ElectronicDevice]) => xs.sortBy(_.id)
 
+  @SuppressWarnings(Array("org.wartremover.warts.Throw"))
+  private def unRowWith(salesTaxToRate: Map[SalesTax, SalesTaxRow.Rate]) =
+    (electronicDeviceRow: ElectronicDeviceRow) =>
+      toStandardUnits(
+        ElectronicDeviceRow
+          .unRowWith(electronicDeviceRow, salesTaxToRate)
+          .getOrElse(throw IllegalArgumentException("Failed to un-row electronic device")),
+      )
+
   private val toStandardUnits = (electronicDevice: ElectronicDevice) =>
     val roundedPower = electronicDevice.powerConsumption
       .in(Watts)
@@ -80,16 +96,22 @@ object ElectronicsRepositorySuite:
     val roundedPrice = electronicDevice.price
       .in(euroContext.defaultCurrency)
       .map(amount => BigDecimal(amount).setScale(5, BigDecimal.RoundingMode.HALF_UP).doubleValue)
-    electronicDevice.copy(powerConsumption = roundedPower, price = roundedPrice)
+    val roundedTax = ElectronicDevice.Tax.applyUnsafe(
+      BigDecimal(electronicDevice.tax).setScale(2, BigDecimal.RoundingMode.HALF_UP).doubleValue,
+    )
+    electronicDevice.copy(powerConsumption = roundedPower, price = roundedPrice, tax = roundedTax)
 
   private val findElectronicDeviceByIdTestCaseGen = for
+    salesTaxes <- salesTaxRowsGen
+    salesTaxToRate = salesTaxes.map(x => x.tax -> x.rate).toMap
     selectedId <- idGen
-    selectedElectronicDevice <- electronicDeviceGen(selectedId)
+    selectedElectronicDevice <- electronicDeviceRowGen(selectedId)
     size <- Gen.choose(3, 5)
     otherIds <- nDistinctExcluding(size, idGen, Set(selectedId))
-    otherElectronicDevices <- otherIds.traverse(id => electronicDeviceGen(id))
-    expected = Option(selectedElectronicDevice).map(toStandardUnits)
+    otherElectronicDevices <- otherIds.traverse(id => electronicDeviceRowGen(id))
+    expected = Option(selectedElectronicDevice).map(unRowWith(salesTaxToRate))
   yield TestCase(
+    salesTaxes,
     selectedElectronicDevice :: otherElectronicDevices,
     Equal(selectedId),
     NoSort,
@@ -98,13 +120,17 @@ object ElectronicsRepositorySuite:
   )
 
   private val selectAllTestCaseGen = for
+    salesTaxes <- salesTaxRowsGen
+    salesTaxToRate = salesTaxes.map(x => x.tax -> x.rate).toMap
     size <- Gen.choose(3, 5)
     ids <- nDistinct(size, idGen)
-    electronicDevices <- ids.traverse(id => electronicDeviceGen(id))
-    expected = electronicDevices.map(toStandardUnits)
-  yield TestCase(electronicDevices, NoFilter, NoSort, expected, sortById)
+    electronicDevices <- ids.traverse(id => electronicDeviceRowGen(id))
+    expected = electronicDevices.map(unRowWith(salesTaxToRate))
+  yield TestCase(salesTaxes, electronicDevices, NoFilter, NoSort, expected, sortById)
 
   private val filterAndSortTestCaseGen = for
+    salesTaxes <- salesTaxRowsGen
+    salesTaxToRate = salesTaxes.map(x => x.tax -> x.rate).toMap
     size <- Gen.choose(3, 5)
     selectedIds <- nDistinct(size, idGen)
     otherIds <- nDistinctExcluding(size, idGen, selectedIds)
@@ -112,7 +138,7 @@ object ElectronicsRepositorySuite:
     otherCategories = Category.values.toList.diff(selectedCategories)
     priceRange <- rangeDoubleGen(10d, 1_000d)
     selectedElectronicDevices <- selectedIds.traverse(id =>
-      electronicDeviceGen(
+      electronicDeviceRowGen(
         idGen = id,
         categoryGen = Gen.oneOf(selectedCategories),
         priceGen =
@@ -120,7 +146,7 @@ object ElectronicsRepositorySuite:
       ),
     )
     otherElectronicDevices <- otherIds.traverse(id =>
-      electronicDeviceGen(
+      electronicDeviceRowGen(
         idGen = id,
         categoryGen = Gen.oneOf(otherCategories),
         priceGen = Gen
@@ -146,7 +172,7 @@ object ElectronicsRepositorySuite:
       (Descending(sortablePrice), (xs: List[ElectronicDevice]) => xs.sortBy(_.price).reverse),
     )
     (sort, sortingFunction) = sortWithFunction
-    roundedUnits = selectedElectronicDevices.map(toStandardUnits)
+    roundedUnits = selectedElectronicDevices.map(unRowWith(salesTaxToRate))
     expected = sortingFunction(roundedUnits)
     diff = if sort == NoSort then sortById else identity[List[ElectronicDevice]]
-  yield TestCase(electronicDevices, filter, sort, expected, diff)
+  yield TestCase(salesTaxes, electronicDevices, filter, sort, expected, diff)

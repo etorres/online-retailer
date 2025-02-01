@@ -7,9 +7,11 @@ import clothing.ClothingRepositorySuite.{
   selectAllTestCaseGen,
   TestCase,
 }
-import clothing.GarmentGenerators.{categoryGen, colorGen, garmentGen, idGen}
-import clothing.db.GarmentConnection.{sortablePrice, given}
-import clothing.db.TestClothingRepository
+import clothing.GarmentGenerators.{categoryGen, colorGen, idGen}
+import clothing.db.GarmentTable.{sortablePrice, given}
+import clothing.db.{GarmentRow, TestClothingRepository}
+import commons.domain.DomainGenerators.salesTaxRowsGen
+import commons.domain.{SalesTax, SalesTaxRow, TestSalesTaxRepository}
 import commons.market.EuroMoneyContext.given
 import commons.query.Filter.Combinator.{And, In}
 import commons.query.Filter.Comparator.{Between, Equal}
@@ -22,6 +24,7 @@ import commons.spec.RangeGenerators.rangeDoubleGen
 
 import cats.effect.IO
 import cats.implicits.{toFoldableOps, toTraverseOps}
+import es.eriktorr.clothing.db.GarmentRowGenerators.garmentRowGen
 import org.scalacheck.Gen
 import org.scalacheck.cats.implicits.given
 import org.scalacheck.effect.PropF.forAllF
@@ -52,18 +55,21 @@ final class ClothingRepositorySuite extends PostgresSuite:
       run: (ClothingRepository, B, Sort) => IO[A],
   ) =
     forAllF(testCaseGen):
-      case TestCase(garments, filter, sort, expected, diff) =>
+      case TestCase(salesTaxRows, garmentRows, filter, sort, expected, diff) =>
         testTransactor.resource.use: transactor =>
+          val testSalesTaxRepository = TestSalesTaxRepository(transactor)
           val testClothingRepository = TestClothingRepository(transactor)
           val testee = ClothingRepository.Postgres(transactor)
           (for
-            _ <- garments.traverse_(testClothingRepository.add)
+            _ <- salesTaxRows.traverse_(testSalesTaxRepository.add)
+            _ <- garmentRows.traverse_(testClothingRepository.add)
             obtained <- run(testee, filter, sort)
           yield diff(obtained)).assertEquals(diff(expected))
 
 object ClothingRepositorySuite:
   final private case class TestCase[A, B <: Filter](
-      garments: List[Garment],
+      salesTaxRows: List[SalesTaxRow],
+      garmentRows: List[GarmentRow],
       filter: B,
       sort: Sort,
       expected: A,
@@ -72,20 +78,35 @@ object ClothingRepositorySuite:
 
   private val sortById = (xs: List[Garment]) => xs.sortBy(_.id)
 
-  private val priceToEur = (garment: Garment) =>
+  @SuppressWarnings(Array("org.wartremover.warts.Throw"))
+  private def unRowWith(salesTaxToRate: Map[SalesTax, SalesTaxRow.Rate]) =
+    (garmentRow: GarmentRow) =>
+      toStandardUnits(
+        GarmentRow
+          .unRowWith(garmentRow, salesTaxToRate)
+          .getOrElse(throw IllegalArgumentException("Failed to un-row garment")),
+      )
+
+  private val toStandardUnits = (garment: Garment) =>
     val roundedPrice = garment.price
       .in(euroContext.defaultCurrency)
       .map(amount => BigDecimal(amount).setScale(5, BigDecimal.RoundingMode.HALF_UP).doubleValue)
-    garment.copy(price = roundedPrice)
+    val roundedTax = Garment.Tax.applyUnsafe(
+      BigDecimal(garment.tax).setScale(2, BigDecimal.RoundingMode.HALF_UP).doubleValue,
+    )
+    garment.copy(price = roundedPrice, tax = roundedTax)
 
   private val findGarmentByIdTestCaseGen = for
+    salesTaxes <- salesTaxRowsGen
+    salesTaxToRate = salesTaxes.map(x => x.tax -> x.rate).toMap
     selectedId <- idGen
-    selectedGarment <- garmentGen(selectedId)
+    selectedGarment <- garmentRowGen(selectedId)
     size <- Gen.choose(3, 5)
     otherIds <- nDistinctExcluding(size, idGen, Set(selectedId))
-    otherGarments <- otherIds.traverse(id => garmentGen(id))
-    expected = Option(selectedGarment).map(priceToEur)
+    otherGarments <- otherIds.traverse(id => garmentRowGen(id))
+    expected = Option(selectedGarment).map(unRowWith(salesTaxToRate))
   yield TestCase(
+    salesTaxes,
     selectedGarment :: otherGarments,
     Equal(selectedId),
     NoSort,
@@ -94,13 +115,17 @@ object ClothingRepositorySuite:
   )
 
   private val selectAllTestCaseGen = for
+    salesTaxes <- salesTaxRowsGen
+    salesTaxToRate = salesTaxes.map(x => x.tax -> x.rate).toMap
     size <- Gen.choose(3, 5)
     ids <- nDistinct(size, idGen)
-    garments <- ids.traverse(id => garmentGen(id))
-    expected = garments.map(priceToEur)
-  yield TestCase(garments, NoFilter, NoSort, expected, sortById)
+    garments <- ids.traverse(id => garmentRowGen(id))
+    expected = garments.map(unRowWith(salesTaxToRate))
+  yield TestCase(salesTaxes, garments, NoFilter, NoSort, expected, sortById)
 
   private val filterAndSortTestCaseGen = for
+    salesTaxes <- salesTaxRowsGen
+    salesTaxToRate = salesTaxes.map(x => x.tax -> x.rate).toMap
     size <- Gen.choose(3, 5)
     selectedIds <- nDistinct(size, idGen)
     otherIds <- nDistinctExcluding(size, idGen, selectedIds)
@@ -110,7 +135,7 @@ object ClothingRepositorySuite:
     otherColors = Color.values.toList.diff(selectedColors)
     priceRange <- rangeDoubleGen(10d, 1_000d)
     selectedGarments <- selectedIds.traverse(id =>
-      garmentGen(
+      garmentRowGen(
         idGen = id,
         categoryGen = Gen.oneOf(selectedCategories),
         colorGen = Gen.oneOf(selectedColors),
@@ -119,7 +144,7 @@ object ClothingRepositorySuite:
       ),
     )
     otherGarments <- otherIds.traverse(id =>
-      garmentGen(
+      garmentRowGen(
         idGen = id,
         categoryGen = Gen.oneOf(otherCategories),
         colorGen = Gen.oneOf(otherColors),
@@ -136,10 +161,10 @@ object ClothingRepositorySuite:
       Between(priceRange.map(euroContext.defaultCurrency.apply)),
     )
     sort <- Gen.oneOf(Ascending(sortablePrice), Descending(sortablePrice))
-    roundedUnits = selectedGarments.map(priceToEur)
+    roundedUnits = selectedGarments.map(unRowWith(salesTaxToRate))
     expected = sort match
       case Ascending(sortable) => roundedUnits.sortBy(_.price.amount)
       case Descending(sortable) => roundedUnits.sortBy(_.price.amount).reverse
       case NoSort => roundedUnits
     diff = if sort == NoSort then sortById else identity[List[Garment]]
-  yield TestCase(garments, filter, sort, expected, diff)
+  yield TestCase(salesTaxes, garments, filter, sort, expected, diff)

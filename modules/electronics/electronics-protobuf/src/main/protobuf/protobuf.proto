@@ -3,6 +3,7 @@ syntax = "proto3";
 package es.eriktorr.electronics;
 
 import "scalapb/scalapb.proto";
+import "google/protobuf/timestamp.proto";
 
 option (scalapb.options) = {
   import: "es.eriktorr.electronics.given"
@@ -14,8 +15,10 @@ message ElectronicDevice {
   string model = 3;
   string powerConsumption = 4 [(scalapb.field).type = "squants.energy.Power"];
   string price = 5 [(scalapb.field).type = "squants.market.Money"];
-  string description = 6;
-  repeated string images = 7;
+  double tax = 6;
+  string description = 7;
+  google.protobuf.Timestamp launchDate = 8;
+  repeated string images = 9;
   reserved 100 to 200;
 }
 

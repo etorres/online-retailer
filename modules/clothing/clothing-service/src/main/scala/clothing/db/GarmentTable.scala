@@ -2,20 +2,25 @@ package es.eriktorr
 package clothing.db
 
 import clothing.{Category, Color, Garment as DomainGarment, Size}
+import commons.domain.{SalesTax, SalesTaxTable}
 import commons.market.EuroMoneyContext.given
 import commons.query.Column.*
 import commons.query.Filter.Comparator.Equal
-import commons.query.QueryBuilder.{columns as columnsFr, orderBy, where}
-import commons.query.{Column, Filter, Sort}
+import commons.query.QueryBuilder.{comma, join, orderBy, where}
+import commons.query.{Column, Filter, Sort, Table}
 
+import com.softwaremill.tagging.*
 import doobie.implicits.given
 import doobie.postgres.implicits.given
-import doobie.util.fragments.parentheses
 import doobie.{ConnectionIO, Meta}
 import fs2.Stream
 import squants.Money
 
-sealed private trait GarmentConnection:
+import java.time.LocalDate
+
+object GarmentTable extends Table[GarmentRow]:
+  implicit override val name: Table.Name = "garments".taggedWith[Table.TableNameTag]
+
   // Column definitions
   private val idColumn = filterable[DomainGarment.Id]("id")
   private val categoryColumn = filterable[Category]("category")
@@ -23,18 +28,48 @@ sealed private trait GarmentConnection:
   private val sizeColumn = filterable[Size]("size")
   private val colorColumn = filterable[Color]("color")
   private val priceColumn = filterableAndSortable[Money]("price_in_eur")
+  private val rateColumn = column[DomainGarment.Tax]("rate")(using SalesTaxTable.name)
+  private val taxColumn = column[SalesTax]("tax")
   private val descriptionColumn = filterable[DomainGarment.Description]("description")
+  private val launchDateColumn = filterableAndSortable[LocalDate]("launch_date")
   private val imagesColumn = column[List[String]]("images")
 
-  protected val allColumns: List[Column[?]] = List(
+  override def read: List[Column[_]] = List(
     idColumn,
     categoryColumn,
     modelColumn,
     sizeColumn,
     colorColumn,
     priceColumn,
+    rateColumn,
     descriptionColumn,
+    launchDateColumn,
     imagesColumn,
+  )
+
+  override def write(garmentRow: GarmentRow): Table.Write = Table.Write(
+    List(
+      idColumn,
+      categoryColumn,
+      modelColumn,
+      sizeColumn,
+      colorColumn,
+      priceColumn,
+      taxColumn,
+      descriptionColumn,
+      launchDateColumn,
+      imagesColumn,
+    ),
+    sql"""${garmentRow.id},
+         |${garmentRow.category},
+         |${garmentRow.model},
+         |${garmentRow.size},
+         |${garmentRow.color},
+         |${garmentRow.priceInEur},
+         |${garmentRow.tax},
+         |${garmentRow.description},
+         |${garmentRow.launchDate},
+         |${garmentRow.images}""".stripMargin,
   )
 
   // Filterable columns
@@ -44,9 +79,11 @@ sealed private trait GarmentConnection:
   given Filterable[Size] = sizeColumn
   given Filterable[Color] = colorColumn
   given Filterable[Money] = priceColumn
+  given Filterable[LocalDate] = launchDateColumn
 
   // Sortable columns
   given sortablePrice: Sortable[Money] = priceColumn
+  given sortableLaunchDate: Sortable[LocalDate] = launchDateColumn
 
   // Doobie mappers
   given Meta[DomainGarment.Id] = Meta[Long].tiemap(DomainGarment.Id.either)(_.value)
@@ -57,35 +94,30 @@ sealed private trait GarmentConnection:
   given Meta[Money] = Meta[BigDecimal].timap(euroContext.defaultCurrency.apply)(
     _.in(euroContext.defaultCurrency).amount,
   )
+  given Meta[DomainGarment.Tax] = Meta[Double].tiemap(DomainGarment.Tax.either)(_.value)
   given Meta[DomainGarment.Description] =
     Meta[String].tiemap(DomainGarment.Description.either)(_.value)
 
-object GarmentConnection extends GarmentConnection:
-  private val table = fr"garments"
-
-  private val columns = columnsFr(allColumns)
-
   @SuppressWarnings(Array("org.wartremover.warts.Any"))
   def findGarmentBy(id: DomainGarment.Id): ConnectionIO[Option[Garment]] =
-    val select = fr"SELECT" ++ columns ++ fr"FROM" ++ table
+    given ColumnFormatter = ColumnFormatter.FullQualifiedName
+    val select = fr"SELECT" ++ comma(read) ++ join(
+      GarmentTable.taxColumn,
+      SalesTaxTable.taxColumn,
+    )
     val sql = select ++ where(Equal(id))
     sql.query[Garment].option
 
   @SuppressWarnings(Array("org.wartremover.warts.Any"))
   def selectGarmentsBy(filter: Filter, sort: Sort, chunkSize: Int): Stream[ConnectionIO, Garment] =
-    val select = fr"SELECT" ++ columns ++ fr"FROM" ++ table
+    given ColumnFormatter = ColumnFormatter.FullQualifiedName
+    val select = fr"SELECT" ++ comma(read) ++ join(
+      GarmentTable.taxColumn,
+      SalesTaxTable.taxColumn,
+    )
     val sql = select ++ where(filter) ++ orderBy(sort)
     sql.query[Garment].streamWithChunkSize(chunkSize)
 
-  def insert(garment: Garment): ConnectionIO[Int] =
-    val sql = fr"INSERT INTO" ++ table ++ parentheses(columns) ++ fr"VALUES" ++ parentheses(
-      sql"""${garment.id},
-           |${garment.category},
-           |${garment.model},
-           |${garment.size},
-           |${garment.color},
-           |${garment.priceInEur},
-           |${garment.description},
-           |${garment.images}""".stripMargin,
-    )
+  def insert(garmentRow: GarmentRow): ConnectionIO[Int] =
+    val sql = fr"INSERT INTO" ++ this.sql ++ write(garmentRow).sql
     sql.update.run

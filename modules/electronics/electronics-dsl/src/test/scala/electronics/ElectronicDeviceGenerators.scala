@@ -6,9 +6,12 @@ import commons.market.EuroMoneyContext.given
 import commons.spec.CollectionGenerators.nDistinct
 import commons.spec.StringGenerators.alphaNumericStringBetween
 
+import es.eriktorr.commons.spec.TemporalGenerators.localDateGen
 import org.scalacheck.Gen
 import squants.energy.{Power, Watts}
 import squants.market.Money
+
+import java.time.LocalDate
 
 object ElectronicDeviceGenerators:
   val idGen: Gen[ElectronicDevice.Id] =
@@ -27,8 +30,12 @@ object ElectronicDeviceGenerators:
   yield Money(amount, currency))
     .retryUntil(_.in(euroContext.defaultCurrency) <= EuroMoneyContext.max)
 
+  val taxGen: Gen[ElectronicDevice.Tax] = Gen.choose(0d, 1d).map(ElectronicDevice.Tax.applyUnsafe)
+
   val descriptionGen: Gen[ElectronicDevice.Description] =
     alphaNumericStringBetween(5, 7).map(ElectronicDevice.Description.applyUnsafe)
+
+  val launchDateGen: Gen[LocalDate] = localDateGen
 
   val imageGen: Gen[ElectronicDevice.Image] = for
     filename <- alphaNumericStringBetween(3, 5)
@@ -46,7 +53,9 @@ object ElectronicDeviceGenerators:
       modelGen: Gen[ElectronicDevice.Model] = modelGen,
       powerConsumptionGen: Gen[Power] = powerConsumptionGen,
       priceGen: Gen[Money] = priceGen,
+      taxGen: Gen[ElectronicDevice.Tax] = taxGen,
       descriptionGen: Gen[ElectronicDevice.Description] = descriptionGen,
+      launchDateGen: Gen[LocalDate] = launchDateGen,
       imagesGen: Gen[List[ElectronicDevice.Image]] = imagesGen,
   ): Gen[ElectronicDevice] = for
     id <- idGen
@@ -54,6 +63,18 @@ object ElectronicDeviceGenerators:
     model <- modelGen
     powerConsumption <- powerConsumptionGen
     price <- priceGen
+    tax <- taxGen
     description <- descriptionGen
+    launchDate <- launchDateGen
     images <- imagesGen
-  yield ElectronicDevice(id, category, model, powerConsumption, price, description, images)
+  yield ElectronicDevice(
+    id,
+    category,
+    model,
+    powerConsumption,
+    price,
+    tax,
+    description,
+    launchDate,
+    images,
+  )

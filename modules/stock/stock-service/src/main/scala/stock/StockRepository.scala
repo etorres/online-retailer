@@ -3,7 +3,7 @@ package stock
 
 import commons.query.Row.unRow
 import commons.query.{Filter, Sort}
-import stock.db.StockAvailabilityConnection
+import stock.db.StockAvailabilityTable
 
 import cats.effect.IO
 import doobie.hikari.HikariTransactor
@@ -26,6 +26,5 @@ object StockRepository:
         sort: Sort,
         chunkSize: Int = StockRepository.defaultChunkSize,
     ): Stream[IO, StockAvailability] =
-      val connection =
-        StockAvailabilityConnection.selectStockAvailabilitiesBy(filter, sort, chunkSize)
+      val connection = StockAvailabilityTable.selectStockAvailabilitiesBy(filter, sort, chunkSize)
       connection.transact(transactor).map(_.unRow)

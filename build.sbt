@@ -3,7 +3,7 @@ ThisBuild / version := "1.0.0"
 ThisBuild / idePackagePrefix := Some("es.eriktorr")
 Global / excludeLintKeys += idePackagePrefix
 
-ThisBuild / scalaVersion := "3.3.4"
+ThisBuild / scalaVersion := "3.3.5"
 ThisBuild / resolvers += "Confluent Maven Repository" at "https://packages.confluent.io/maven/"
 
 ThisBuild / semanticdbEnabled := true
@@ -26,6 +26,7 @@ lazy val withBaseSettings: Project => Project = _.settings(
   Compile / compile / wartremoverErrors ++= warts,
   Test / compile / wartremoverErrors ++= warts,
   libraryDependencies ++= Seq(
+    "com.47deg" %% "scalacheck-toolbox-datetime" % "0.7.0" % Test,
     "io.chrisdavenport" %% "cats-scalacheck" % "0.3.2" % Test,
     "org.apache.logging.log4j" % "log4j-core" % "2.24.3" % Test,
     "org.apache.logging.log4j" % "log4j-layout-template-json" % "2.24.3" % Test,
@@ -276,6 +277,7 @@ lazy val `product-search` = project
   .settings(
     libraryDependencies ++= Seq(
       "com.github.ghostdogpr" %% "caliban-quick" % "2.9.1",
+      "com.github.poslegm" %% "munit-zio" % "0.3.0" % Test,
       "dev.zio" %% "zio-interop-cats" % "23.1.0.3",
       "org.typelevel" %% "cats-core" % "2.13.0",
       "org.typelevel" %% "cats-effect" % "3.5.7",

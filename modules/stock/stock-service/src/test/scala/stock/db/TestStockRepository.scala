@@ -11,5 +11,5 @@ import doobie.implicits.*
 
 final class TestStockRepository(transactor: HikariTransactor[IO]):
   def add(stockAvailability: StockAvailability): IO[Unit] =
-    val connection = StockAvailabilityConnection.insert(stockAvailability.row)
+    val connection = StockAvailabilityTable.insert(stockAvailability.row)
     connection.transact(transactor).void

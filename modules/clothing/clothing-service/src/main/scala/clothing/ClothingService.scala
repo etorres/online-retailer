@@ -3,7 +3,7 @@ package clothing
 
 import clothing.Garment as DomainGarment
 import clothing.ProtobufWires.given
-import clothing.db.GarmentConnection.{sortablePrice, given}
+import clothing.db.GarmentTable.{sortablePrice, given}
 import clothing.protobuf.ClothingRequest.Filter.SearchTerm.Field as SearchTermField
 import clothing.protobuf.ClothingRequest.Sort.{Field as SortField, Order as SortOrder}
 import clothing.protobuf.{

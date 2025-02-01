@@ -12,7 +12,7 @@ import commons.spec.PostgresSuite
 import commons.spec.RangeGenerators.rangeIntGen
 import stock.StockAvailabilityGenerators.{categoryGen, skuGen, stockAvailabilityGen}
 import stock.StockRepositorySuite.{filterAndSortTestCaseGen, selectAllTestCaseGen, TestCase}
-import stock.db.StockAvailabilityConnection.given
+import stock.db.StockAvailabilityTable.given
 import stock.db.TestStockRepository
 
 import cats.implicits.{toFoldableOps, toTraverseOps}

@@ -1,7 +1,7 @@
 package es.eriktorr
 package clothing
 
-import commons.refined.Constraints.{ImagePath, NonEmptyString}
+import commons.refined.Constraints.{ImagePath, NonEmptyString, UnitFraction}
 
 import cats.Order
 import cats.effect.IO
@@ -12,6 +12,8 @@ import io.github.iltotore.iron.constraint.numeric.Positive0
 import io.hypersistence.tsid.TSID
 import squants.Money
 
+import java.time.LocalDate
+
 final case class Garment(
     id: Garment.Id,
     category: Category,
@@ -19,7 +21,9 @@ final case class Garment(
     size: Size,
     color: Color,
     price: Money,
+    tax: Garment.Tax,
     description: Garment.Description,
+    launchDate: LocalDate,
     images: List[Garment.Image],
 ):
   def sku: Garment.Id = id
@@ -34,6 +38,10 @@ object Garment:
   opaque type Model <: String :| NonEmptyString = String :| NonEmptyString
 
   object Model extends RefinedTypeOps[String, NonEmptyString, Model]
+
+  opaque type Tax <: Double :| UnitFraction = Double :| UnitFraction
+
+  object Tax extends RefinedTypeOps[Double, UnitFraction, Tax]
 
   opaque type Description <: String :| NonEmptyString = String :| NonEmptyString
 

@@ -14,6 +14,7 @@ import doobie.{ConnectionIO, Fragment, Meta}
 import munit.{CatsEffectSuite, ScalaCheckEffectSuite}
 import org.scalacheck.effect.PropF.forAllF
 import org.scalacheck.{Gen, Test}
+import com.softwaremill.tagging.*
 
 import scala.concurrent.ExecutionContext
 import scala.util.Random
@@ -155,6 +156,8 @@ object FilterSuite:
 
   object TestEnum:
     given Meta[TestEnum] = Meta[String].timap(TestEnum.valueOf)(_.toString)
+
+  given Table.Name = "table".taggedWith[Table.TableNameTag]
 
   private val filterableInt = filterable[Int]("col_int")
 

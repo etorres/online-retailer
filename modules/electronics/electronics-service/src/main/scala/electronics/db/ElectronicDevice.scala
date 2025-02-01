@@ -9,13 +9,17 @@ import io.github.arainko.ducktape.*
 import squants.energy.Watts
 import squants.{Money, Power}
 
+import java.time.LocalDate
+
 final case class ElectronicDevice(
     id: DomainElectronicDevice.Id,
     category: Category,
     model: DomainElectronicDevice.Model,
     powerConsumptionInWatts: Power,
     priceInEur: Money,
+    tax: DomainElectronicDevice.Tax,
     description: DomainElectronicDevice.Description,
+    launchDate: LocalDate,
     images: List[String],
 )
 

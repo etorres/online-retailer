@@ -5,9 +5,12 @@ import commons.market.EuroMoneyContext
 import commons.market.EuroMoneyContext.euroContext
 import commons.spec.CollectionGenerators.nDistinct
 import commons.spec.StringGenerators.alphaNumericStringBetween
+import commons.spec.TemporalGenerators.localDateGen
 
 import org.scalacheck.Gen
 import squants.market.Money
+
+import java.time.LocalDate
 
 object GarmentGenerators:
   val idGen: Gen[Garment.Id] = Gen.choose(1L, Long.MaxValue).map(Garment.Id.applyUnsafe)
@@ -26,8 +29,12 @@ object GarmentGenerators:
   yield Money(amount, currency))
     .retryUntil(_.in(euroContext.defaultCurrency) <= EuroMoneyContext.max)
 
+  val taxGen: Gen[Garment.Tax] = Gen.choose(0d, 1d).map(Garment.Tax.applyUnsafe)
+
   val descriptionGen: Gen[Garment.Description] =
     alphaNumericStringBetween(5, 7).map(Garment.Description.applyUnsafe)
+
+  val launchDateGen: Gen[LocalDate] = localDateGen
 
   val imageGen: Gen[Garment.Image] = for
     filename <- alphaNumericStringBetween(3, 5)
@@ -46,7 +53,9 @@ object GarmentGenerators:
       sizeGen: Gen[Size] = sizeGen,
       colorGen: Gen[Color] = colorGen,
       priceGen: Gen[Money] = priceGen,
+      taxGen: Gen[Garment.Tax] = taxGen,
       descriptionGen: Gen[Garment.Description] = descriptionGen,
+      launchDateGen: Gen[LocalDate] = launchDateGen,
       imagesGen: Gen[List[Garment.Image]] = imagesGen,
   ): Gen[Garment] = for
     id <- idGen
@@ -55,6 +64,8 @@ object GarmentGenerators:
     size <- sizeGen
     color <- colorGen
     price <- priceGen
+    tax <- taxGen
     description <- descriptionGen
+    launchDate <- launchDateGen
     images <- imagesGen
-  yield Garment(id, category, model, size, color, price, description, images)
+  yield Garment(id, category, model, size, color, price, tax, description, launchDate, images)

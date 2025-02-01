@@ -3,7 +3,7 @@ package electronics
 
 import commons.query.Row.unRow
 import commons.query.{Filter, Sort}
-import electronics.db.ElectronicDeviceConnection
+import electronics.db.ElectronicDeviceTable
 
 import cats.data.OptionT
 import cats.effect.IO
@@ -24,7 +24,7 @@ object ElectronicsRepository:
 
   final class Postgres(transactor: HikariTransactor[IO]) extends ElectronicsRepository:
     override def findElectronicDeviceBy(id: ElectronicDevice.Id): OptionT[IO, ElectronicDevice] =
-      val connection = ElectronicDeviceConnection.findElectronicDeviceBy(id)
+      val connection = ElectronicDeviceTable.findElectronicDeviceBy(id)
       OptionT(connection.transact(transactor).map(_.unRow))
 
     override def selectElectronicDevicesBy(
@@ -32,5 +32,5 @@ object ElectronicsRepository:
         sort: Sort,
         chunkSize: Int = defaultChunkSize,
     ): Stream[IO, ElectronicDevice] =
-      val connection = ElectronicDeviceConnection.selectElectronicDevicesBy(filter, sort, chunkSize)
+      val connection = ElectronicDeviceTable.selectElectronicDevicesBy(filter, sort, chunkSize)
       connection.transact(transactor).map(_.unRow)

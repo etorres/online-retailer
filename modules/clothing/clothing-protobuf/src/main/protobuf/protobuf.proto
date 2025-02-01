@@ -3,6 +3,7 @@ syntax = "proto3";
 package es.eriktorr.clothing;
 
 import "scalapb/scalapb.proto";
+import "google/protobuf/timestamp.proto";
 
 option (scalapb.options) = {
   import: "es.eriktorr.clothing.given"
@@ -15,8 +16,10 @@ message Garment {
   string size = 4;
   string color = 5;
   string price = 6 [(scalapb.field).type = "squants.market.Money"];
-  string description = 7;
-  repeated string images = 8;
+  double tax = 7;
+  string description = 8;
+  google.protobuf.Timestamp launchDate = 9;
+  repeated string images = 10;
   reserved 100 to 200;
 }
 

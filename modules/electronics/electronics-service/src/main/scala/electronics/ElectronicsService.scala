@@ -9,7 +9,7 @@ import commons.query.Filter.NoFilter
 import commons.query.Sort.NoSort
 import commons.query.{Filter, Sort}
 import electronics.ProtobufWires.given
-import electronics.db.ElectronicDeviceConnection.given
+import electronics.db.ElectronicDeviceTable.given
 import electronics.protobuf.ElectronicsRequest.Filter.SearchTerm.Field as SearchTermField
 import electronics.protobuf.ElectronicsRequest.Sort.{Field as SortField, Order as SortOrder}
 import electronics.protobuf.{

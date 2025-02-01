@@ -12,6 +12,7 @@ import doobie.{ConnectionIO, Fragment}
 import munit.{CatsEffectSuite, ScalaCheckEffectSuite}
 import org.scalacheck.Gen
 import org.scalacheck.effect.PropF.forAllF
+import com.softwaremill.tagging.*
 
 import scala.concurrent.ExecutionContext
 import scala.util.Random
@@ -48,5 +49,7 @@ object SortSuite:
         executionContext,
       )
       .use(query.transact)
+
+  given Table.Name = "table".taggedWith[Table.TableNameTag]
 
   private val sortableInt = sortable[Int]("col_int")
