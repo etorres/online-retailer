@@ -2,7 +2,7 @@ package es.eriktorr
 package clothing
 
 import commons.market.EuroMoneyContext
-import commons.market.EuroMoneyContext.euroContext
+import commons.market.EuroMoneyContext.given
 import commons.spec.CollectionGenerators.nDistinct
 import commons.spec.StringGenerators.alphaNumericStringBetween
 import commons.spec.TemporalGenerators.localDateGen

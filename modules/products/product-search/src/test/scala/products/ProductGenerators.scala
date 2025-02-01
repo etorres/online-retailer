@@ -25,7 +25,7 @@ object ProductGenerators:
         electronicDevice =>
           electronicDevice -> Product.ElectronicDevice(
             electronicDevice.id,
-            electronicDevice.category.name,
+            electronicDevice.category.toString,
             electronicDevice.model,
             args =>
               (args.powerUnit.getOrElse(PowerUnit.Watts) match
@@ -48,7 +48,7 @@ object ProductGenerators:
       1 -> garmentGen(idGen = idGen.map(Garment.Id.applyUnsafe)).map(garment =>
         garment -> Product.Garment(
           garment.id,
-          garment.category.name,
+          garment.category.toString,
           garment.model,
           garment.size.toString,
           garment.color.toString,

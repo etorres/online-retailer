@@ -46,3 +46,6 @@ object StockAvailabilityGenerators:
     unitPrice <- unitPriceGen
     reorderLevel <- reorderLevelGen
   yield StockAvailability(sku, name, category, quantity, unitPrice, reorderLevel)
+
+  def availableStock(skuGen: Gen[StockAvailability.SKU] = skuGen): Gen[StockAvailability] =
+    stockAvailabilityGen(skuGen).retryUntil(_.isAvailable)
