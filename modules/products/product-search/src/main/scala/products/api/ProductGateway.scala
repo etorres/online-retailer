@@ -18,7 +18,6 @@ import cats.implicits.{catsSyntaxTuple2Parallel, catsSyntaxTuple3Parallel, toFun
 import squants.energy.{BtusPerHour, Milliwatts, Watts}
 import squants.market.{EUR, GBP, USD}
 
-import java.time.LocalDate
 import scala.collection.immutable.LongMap
 
 trait ProductGateway[F[_]: Async: Parallel]:
@@ -215,9 +214,9 @@ object ProductGateway:
             case Currency.GBP => electronicDevice.price.in(GBP)
             case Currency.USD => electronicDevice.price.in(USD)
           ).value,
-        defaultTax,
+        electronicDevice.tax,
         electronicDevice.description,
-        LocalDate.now(),
+        electronicDevice.launchDate,
         electronicDevice.images.map(_.value),
       )
 
@@ -234,13 +233,11 @@ object ProductGateway:
             case Currency.GBP => garment.price.in(GBP)
             case Currency.USD => garment.price.in(USD)
           ).value,
-        defaultTax,
+        garment.tax,
         garment.description,
-        LocalDate.now(),
+        garment.launchDate,
         garment.images.map(_.value),
       )
-
-  private lazy val defaultTax = 21d
 
   def resource[F[_]: Async: Parallel](grpcConfig: GrpcConfig): Resource[F, Grpc[F]] =
     for

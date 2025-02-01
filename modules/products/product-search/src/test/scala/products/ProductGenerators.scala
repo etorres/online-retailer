@@ -4,8 +4,6 @@ package products
 import clothing.Garment
 import clothing.GarmentGenerators.garmentGen
 import commons.market.EuroMoneyContext.given
-import commons.spec.TemporalGenerators
-import commons.spec.TemporalGenerators.localDateGen
 import electronics.ElectronicDevice
 import electronics.ElectronicDeviceGenerators.electronicDeviceGen
 import products.Product.{Currency, PowerUnit}
@@ -14,30 +12,15 @@ import org.scalacheck.Gen
 import squants.energy.{BtusPerHour, Milliwatts, Watts}
 import squants.market.{EUR, GBP, USD}
 
-import java.time.LocalDate
-
 object ProductGenerators:
   val idGen: Gen[Long] = Gen.choose(1L, Long.MaxValue)
 
-  val launchDateGen: Gen[LocalDate] = localDateGen
+  def productGen(idGen: Gen[Long] = idGen): Gen[Product] =
+    productGenWithSeed(idGen).map:
+      case (_, product) => product
 
-  val taxGen: Gen[Double] = Gen.choose(1d, 25d)
-
-  def productGen(
-      idGen: Gen[Long] = idGen,
-      taxGen: Gen[Double] = taxGen,
-      launchDateGen: Gen[LocalDate] = launchDateGen,
-  ): Gen[Product] = productGenWithSeed(idGen, taxGen, launchDateGen).map:
-    case (_, product) => product
-
-  def productGenWithSeed(
-      idGen: Gen[Long] = idGen,
-      taxGen: Gen[Double] = taxGen,
-      launchDateGen: Gen[LocalDate] = launchDateGen,
-  ): Gen[(ElectronicDevice | Garment, Product)] = for
-    tax <- taxGen
-    launchDate <- launchDateGen
-    product <- Gen.frequency(
+  def productGenWithSeed(idGen: Gen[Long] = idGen): Gen[(ElectronicDevice | Garment, Product)] =
+    Gen.frequency(
       1 -> electronicDeviceGen(idGen = idGen.map(ElectronicDevice.Id.applyUnsafe)).map(
         electronicDevice =>
           electronicDevice -> Product.ElectronicDevice(
@@ -56,9 +39,9 @@ object ProductGenerators:
                 case Currency.GBP => electronicDevice.price.in(GBP)
                 case Currency.USD => electronicDevice.price.in(USD)
               ).value,
-            tax,
+            electronicDevice.tax,
             electronicDevice.description,
-            launchDate,
+            electronicDevice.launchDate,
             electronicDevice.images,
           ),
       ),
@@ -75,11 +58,10 @@ object ProductGenerators:
               case Currency.GBP => garment.price.in(GBP)
               case Currency.USD => garment.price.in(USD)
             ).value,
-          tax,
+          garment.tax,
           garment.description,
-          launchDate,
+          garment.launchDate,
           garment.images,
         ),
       ),
     )
-  yield product
