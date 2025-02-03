@@ -3,17 +3,16 @@ package stock.db
 
 import commons.market.EuroMoneyContext.given
 import commons.query.Column.{column, filterableAndSortable, Filterable, Sortable}
-import commons.query.QueryBuilder.{comma, orderBy, where}
-import commons.query.{Column, Filter, Sort, Table}
+import commons.query.{Column, Table}
 import stock.StockAvailability as DomainStockAvailability
 
 import com.softwaremill.tagging.*
+import doobie.Meta
 import doobie.implicits.*
-import doobie.{ConnectionIO, Meta}
-import fs2.Stream
 import squants.Money
 
-object StockAvailabilityTable extends Table[StockAvailability]:
+object StockAvailabilityTable
+    extends Table[DomainStockAvailability.SKU, StockAvailability, StockAvailability]:
   implicit override val name: Table.Name = "stock_availability".taggedWith[Table.TableNameTag]
 
   // Column definitions
@@ -67,17 +66,3 @@ object StockAvailabilityTable extends Table[StockAvailability]:
   )
   given Meta[DomainStockAvailability.ReorderLevel] =
     Meta[Int].tiemap(DomainStockAvailability.ReorderLevel.either)(_.value)
-
-  @SuppressWarnings(Array("org.wartremover.warts.Any"))
-  def selectStockAvailabilitiesBy(
-      filter: Filter,
-      sort: Sort,
-      chunkSize: Int,
-  ): Stream[ConnectionIO, StockAvailability] =
-    val select = fr"SELECT" ++ comma(read) ++ fr"FROM" ++ this.sql
-    val sql = select ++ where(filter) ++ orderBy(sort)
-    sql.query[StockAvailability].streamWithChunkSize(chunkSize)
-
-  def insert(stockAvailability: StockAvailability): ConnectionIO[Int] =
-    val sql = fr"INSERT INTO" ++ this.sql ++ write(stockAvailability).sql
-    sql.update.run

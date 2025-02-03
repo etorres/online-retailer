@@ -17,16 +17,17 @@ import commons.query.{Column, Filter, QueryBuilder, Sort, Table}
 import electronics.{Category, ElectronicDevice as DomainElectronicDevice}
 
 import com.softwaremill.tagging.*
-import doobie.implicits.*
+import doobie.implicits.given
 import doobie.postgres.implicits.given
-import doobie.{ConnectionIO, Meta}
+import doobie.{ConnectionIO, Meta, Put, Read}
 import fs2.Stream
 import squants.energy.Watts
 import squants.{Money, Power}
 
 import java.time.LocalDate
 
-object ElectronicDeviceTable extends Table[ElectronicDeviceRow]:
+object ElectronicDeviceTable
+    extends Table[DomainElectronicDevice.Id, ElectronicDeviceRow, ElectronicDevice]:
   implicit override val name: Table.Name = "electronics".taggedWith[Table.TableNameTag]
 
   // Column definitions
@@ -105,8 +106,10 @@ object ElectronicDeviceTable extends Table[ElectronicDeviceRow]:
     Meta[String].tiemap(DomainElectronicDevice.Description.either)(_.value)
 
   @SuppressWarnings(Array("org.wartremover.warts.Any"))
-  def findElectronicDeviceBy(
-      id: DomainElectronicDevice.Id,
+  override def findBy(id: DomainElectronicDevice.Id)(using
+      idFilterable: Filterable[DomainElectronicDevice.Id],
+      idPut: Put[DomainElectronicDevice.Id],
+      outputRead: Read[ElectronicDevice],
   ): ConnectionIO[Option[ElectronicDevice]] =
     given ColumnFormatter = ColumnFormatter.FullQualifiedName
     val select = fr"SELECT" ++ comma(read) ++ join(
@@ -117,10 +120,8 @@ object ElectronicDeviceTable extends Table[ElectronicDeviceRow]:
     sql.query[ElectronicDevice].option
 
   @SuppressWarnings(Array("org.wartremover.warts.Any"))
-  def selectElectronicDevicesBy(
-      filter: Filter,
-      sort: Sort,
-      chunkSize: Int,
+  override def selectBy(filter: Filter, sort: Sort, chunkSize: Int)(using
+      outputRead: Read[ElectronicDevice],
   ): Stream[ConnectionIO, ElectronicDevice] =
     given ColumnFormatter = ColumnFormatter.FullQualifiedName
     val select = fr"SELECT" ++ comma(read) ++ join(
@@ -129,7 +130,3 @@ object ElectronicDeviceTable extends Table[ElectronicDeviceRow]:
     )
     val sql = select ++ where(filter) ++ orderBy(sort)
     sql.query[ElectronicDevice].streamWithChunkSize(chunkSize)
-
-  def insert(electronicDeviceRow: ElectronicDeviceRow): ConnectionIO[Int] =
-    val sql = fr"INSERT INTO" ++ this.sql ++ write(electronicDeviceRow).sql
-    sql.update.run

@@ -1,6 +1,7 @@
 package es.eriktorr
 package clothing.db
 
+import clothing.Garment.Id
 import clothing.{Category, Color, Garment as DomainGarment, Size}
 import commons.domain.{SalesTax, SalesTaxTable}
 import commons.market.EuroMoneyContext.given
@@ -12,13 +13,13 @@ import commons.query.{Column, Filter, Sort, Table}
 import com.softwaremill.tagging.*
 import doobie.implicits.given
 import doobie.postgres.implicits.given
-import doobie.{ConnectionIO, Meta}
+import doobie.{ConnectionIO, Meta, Put, Read}
 import fs2.Stream
 import squants.Money
 
 import java.time.LocalDate
 
-object GarmentTable extends Table[GarmentRow]:
+object GarmentTable extends Table[DomainGarment.Id, GarmentRow, Garment]:
   implicit override val name: Table.Name = "garments".taggedWith[Table.TableNameTag]
 
   // Column definitions
@@ -99,7 +100,11 @@ object GarmentTable extends Table[GarmentRow]:
     Meta[String].tiemap(DomainGarment.Description.either)(_.value)
 
   @SuppressWarnings(Array("org.wartremover.warts.Any"))
-  def findGarmentBy(id: DomainGarment.Id): ConnectionIO[Option[Garment]] =
+  override def findBy(id: DomainGarment.Id)(using
+      idFilterable: Filterable[DomainGarment.Id],
+      idPut: Put[DomainGarment.Id],
+      outputRead: Read[Garment],
+  ): ConnectionIO[Option[Garment]] =
     given ColumnFormatter = ColumnFormatter.FullQualifiedName
     val select = fr"SELECT" ++ comma(read) ++ join(
       GarmentTable.taxColumn,
@@ -109,7 +114,9 @@ object GarmentTable extends Table[GarmentRow]:
     sql.query[Garment].option
 
   @SuppressWarnings(Array("org.wartremover.warts.Any"))
-  def selectGarmentsBy(filter: Filter, sort: Sort, chunkSize: Int): Stream[ConnectionIO, Garment] =
+  override def selectBy(filter: Filter, sort: Sort, chunkSize: Int)(using
+      outputRead: Read[Garment],
+  ): Stream[ConnectionIO, Garment] =
     given ColumnFormatter = ColumnFormatter.FullQualifiedName
     val select = fr"SELECT" ++ comma(read) ++ join(
       GarmentTable.taxColumn,
@@ -117,7 +124,3 @@ object GarmentTable extends Table[GarmentRow]:
     )
     val sql = select ++ where(filter) ++ orderBy(sort)
     sql.query[Garment].streamWithChunkSize(chunkSize)
-
-  def insert(garmentRow: GarmentRow): ConnectionIO[Int] =
-    val sql = fr"INSERT INTO" ++ this.sql ++ write(garmentRow).sql
-    sql.update.run
