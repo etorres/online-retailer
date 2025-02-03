@@ -4,13 +4,11 @@ package electronics
 import commons.query.Row.unRow
 import commons.query.{Filter, Sort}
 import electronics.db.ElectronicDeviceTable
-import electronics.db.ElectronicDeviceTable.given
 
 import cats.data.OptionT
 import cats.effect.IO
 import doobie.hikari.HikariTransactor
 import doobie.implicits.given
-import doobie.postgres.implicits.given
 import fs2.Stream
 
 trait ElectronicsRepository:
@@ -26,7 +24,7 @@ object ElectronicsRepository:
 
   final class Postgres(transactor: HikariTransactor[IO]) extends ElectronicsRepository:
     override def findElectronicDeviceBy(id: ElectronicDevice.Id): OptionT[IO, ElectronicDevice] =
-      val connection = ElectronicDeviceTable.findBy(id)
+      val connection = ElectronicDeviceTable.Impl.findBy(id)
       OptionT(connection.transact(transactor).map(_.unRow))
 
     override def selectElectronicDevicesBy(
@@ -34,5 +32,5 @@ object ElectronicsRepository:
         sort: Sort,
         chunkSize: Int = defaultChunkSize,
     ): Stream[IO, ElectronicDevice] =
-      val connection = ElectronicDeviceTable.selectBy(filter, sort, chunkSize)
+      val connection = ElectronicDeviceTable.Impl.selectBy(filter, sort, chunkSize)
       connection.transact(transactor).map(_.unRow)

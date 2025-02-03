@@ -11,7 +11,7 @@ import doobie.util.fragments.parentheses
 import doobie.{ConnectionIO, Fragment, Put, Read}
 import fs2.Stream
 
-trait Table[Id, Input, Output]:
+trait Table[Id: Put: Filterable, Input, Output: Read]:
   implicit val name: Table.Name
 
   def sql: Fragment = Fragment.const(name)
@@ -22,18 +22,12 @@ trait Table[Id, Input, Output]:
     val sql = fr"INSERT INTO" ++ this.sql ++ write(item).sql
     sql.update.run
 
-  def findBy(id: Id)(using
-      idFilterable: Filterable[Id],
-      idPut: Put[Id],
-      outputRead: Read[Output],
-  ): ConnectionIO[Option[Output]] =
+  def findBy(id: Id): ConnectionIO[Option[Output]] =
     val select = fr"SELECT" ++ comma(read) ++ fr"FROM" ++ this.sql
     val sql = select ++ where(Equal(id))
     sql.query[Output].option
 
-  def selectBy(filter: Filter, sort: Sort, chunkSize: Int)(using
-      outputRead: Read[Output],
-  ): Stream[ConnectionIO, Output] =
+  def selectBy(filter: Filter, sort: Sort, chunkSize: Int): Stream[ConnectionIO, Output] =
     val select = fr"SELECT" ++ comma(read) ++ fr"FROM" ++ this.sql
     val sql = select ++ where(filter) ++ orderBy(sort)
     sql.query[Output].streamWithChunkSize(chunkSize)

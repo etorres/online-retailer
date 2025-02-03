@@ -2,19 +2,19 @@ package es.eriktorr
 package clothing.db
 
 import clothing.GarmentGenerators.*
-import clothing.db.Garment.given
 import clothing.{Category, Color, Garment, Size}
-import commons.domain.DomainGenerators.salesTaxGen
-import commons.domain.SalesTax
-import commons.query.Row.row
+import clothing.db.GarmentTable.GarmentDbIn
+import commons.market.EuroMoneyContext.given
+import taxes.SalesTax
+import taxes.TaxGenerators.salesTaxGen
 
 import org.scalacheck.Gen
 import squants.market.Money
 
 import java.time.LocalDate
 
-object GarmentRowGenerators:
-  def garmentRowGen(
+object GarmentTableGenerators:
+  def garmentDbInGen(
       idGen: Gen[Garment.Id] = idGen,
       categoryGen: Gen[Category] = categoryGen,
       modelGen: Gen[Garment.Model] = modelGen,
@@ -25,7 +25,7 @@ object GarmentRowGenerators:
       descriptionGen: Gen[Garment.Description] = descriptionGen,
       launchDateGen: Gen[LocalDate] = launchDateGen,
       imagesGen: Gen[List[Garment.Image]] = imagesGen,
-  ): Gen[GarmentRow] = for
+  ): Gen[GarmentDbIn] = for
     garment <- garmentGen(
       idGen = idGen,
       categoryGen = categoryGen,
@@ -37,17 +37,16 @@ object GarmentRowGenerators:
       launchDateGen = launchDateGen,
       imagesGen = imagesGen,
     )
-    garmentRow = garment.row
     tax <- taxGen
-  yield GarmentRow(
-    garmentRow.id,
-    garmentRow.category,
-    garmentRow.model,
-    garmentRow.size,
-    garmentRow.color,
-    garmentRow.priceInEur,
+  yield GarmentDbIn(
+    garment.id,
+    garment.category,
+    garment.model,
+    garment.size,
+    garment.color,
+    garment.price.in(euroContext.defaultCurrency),
     tax,
-    garmentRow.description,
-    garmentRow.launchDate,
-    garmentRow.images,
+    garment.description,
+    garment.launchDate,
+    garment.images,
   )

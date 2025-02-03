@@ -8,10 +8,9 @@ import clothing.ClothingRepositorySuite.{
   TestCase,
 }
 import clothing.GarmentGenerators.{categoryGen, colorGen, idGen}
-import clothing.db.GarmentTable.{sortablePrice, given}
-import clothing.db.{GarmentRow, TestClothingRepository}
-import commons.domain.DomainGenerators.salesTaxRowsGen
-import commons.domain.{SalesTax, SalesTaxRow, TestSalesTaxRepository}
+import clothing.db.GarmentTable.{sortablePrice, GarmentDbIn, given}
+import clothing.db.GarmentTableGenerators.garmentDbInGen
+import clothing.db.TestClothingRepository
 import commons.market.EuroMoneyContext.given
 import commons.query.Filter.Combinator.{And, In}
 import commons.query.Filter.Comparator.{Between, Equal}
@@ -21,10 +20,13 @@ import commons.query.{Filter, Sort}
 import commons.spec.CollectionGenerators.{nDistinct, nDistinctExcluding}
 import commons.spec.PostgresSuite
 import commons.spec.RangeGenerators.rangeDoubleGen
+import taxes.{SalesTax, Tax}
+import taxes.db.TaxesTable.TaxRow
+import taxes.db.TestTaxesRepository
+import taxes.db.TaxRowGenerators.taxRowsGen
 
 import cats.effect.IO
 import cats.implicits.{toFoldableOps, toTraverseOps}
-import es.eriktorr.clothing.db.GarmentRowGenerators.garmentRowGen
 import org.scalacheck.Gen
 import org.scalacheck.cats.implicits.given
 import org.scalacheck.effect.PropF.forAllF
@@ -55,21 +57,21 @@ final class ClothingRepositorySuite extends PostgresSuite:
       run: (ClothingRepository, B, Sort) => IO[A],
   ) =
     forAllF(testCaseGen):
-      case TestCase(salesTaxRows, garmentRows, filter, sort, expected, diff) =>
+      case TestCase(taxRows, garmentDbIns, filter, sort, expected, diff) =>
         testTransactor.resource.use: transactor =>
-          val testSalesTaxRepository = TestSalesTaxRepository(transactor)
+          val testTaxesRepository = TestTaxesRepository(transactor)
           val testClothingRepository = TestClothingRepository(transactor)
           val testee = ClothingRepository.Postgres(transactor)
           (for
-            _ <- salesTaxRows.traverse_(testSalesTaxRepository.add)
-            _ <- garmentRows.traverse_(testClothingRepository.add)
+            _ <- taxRows.traverse_(testTaxesRepository.add)
+            _ <- garmentDbIns.traverse_(testClothingRepository.add)
             obtained <- run(testee, filter, sort)
           yield diff(obtained)).assertEquals(diff(expected))
 
 object ClothingRepositorySuite:
   final private case class TestCase[A, B <: Filter](
-      salesTaxRows: List[SalesTaxRow],
-      garmentRows: List[GarmentRow],
+      taxRows: List[TaxRow],
+      garmentDbIns: List[GarmentDbIn],
       filter: B,
       sort: Sort,
       expected: A,
@@ -79,11 +81,11 @@ object ClothingRepositorySuite:
   private val sortById = (xs: List[Garment]) => xs.sortBy(_.id)
 
   @SuppressWarnings(Array("org.wartremover.warts.Throw"))
-  private def unRowWith(salesTaxToRate: Map[SalesTax, SalesTaxRow.Rate]) =
-    (garmentRow: GarmentRow) =>
+  private def unRowWith(salesTaxToRate: Map[SalesTax, Tax.Rate]) =
+    (garmentDbIn: GarmentDbIn) =>
       toStandardUnits(
-        GarmentRow
-          .unRowWith(garmentRow, salesTaxToRate)
+        GarmentDbIn
+          .unRowWith(garmentDbIn, salesTaxToRate)
           .getOrElse(throw IllegalArgumentException("Failed to un-row garment")),
       )
 
@@ -97,16 +99,16 @@ object ClothingRepositorySuite:
     garment.copy(price = roundedPrice, tax = roundedTax)
 
   private val findGarmentByIdTestCaseGen = for
-    salesTaxes <- salesTaxRowsGen
-    salesTaxToRate = salesTaxes.map(x => x.tax -> x.rate).toMap
+    taxRows <- taxRowsGen
+    salesTaxToRate = taxRows.map(x => x.tax -> x.rate).toMap
     selectedId <- idGen
-    selectedGarment <- garmentRowGen(selectedId)
+    selectedGarment <- garmentDbInGen(selectedId)
     size <- Gen.choose(3, 5)
     otherIds <- nDistinctExcluding(size, idGen, Set(selectedId))
-    otherGarments <- otherIds.traverse(id => garmentRowGen(id))
+    otherGarments <- otherIds.traverse(id => garmentDbInGen(id))
     expected = Option(selectedGarment).map(unRowWith(salesTaxToRate))
   yield TestCase(
-    salesTaxes,
+    taxRows,
     selectedGarment :: otherGarments,
     Equal(selectedId),
     NoSort,
@@ -115,17 +117,17 @@ object ClothingRepositorySuite:
   )
 
   private val selectAllTestCaseGen = for
-    salesTaxes <- salesTaxRowsGen
+    salesTaxes <- taxRowsGen
     salesTaxToRate = salesTaxes.map(x => x.tax -> x.rate).toMap
     size <- Gen.choose(3, 5)
     ids <- nDistinct(size, idGen)
-    garments <- ids.traverse(id => garmentRowGen(id))
+    garments <- ids.traverse(id => garmentDbInGen(id))
     expected = garments.map(unRowWith(salesTaxToRate))
   yield TestCase(salesTaxes, garments, NoFilter, NoSort, expected, sortById)
 
   private val filterAndSortTestCaseGen = for
-    salesTaxes <- salesTaxRowsGen
-    salesTaxToRate = salesTaxes.map(x => x.tax -> x.rate).toMap
+    taxRows <- taxRowsGen
+    salesTaxToRate = taxRows.map(x => x.tax -> x.rate).toMap
     size <- Gen.choose(3, 5)
     selectedIds <- nDistinct(size, idGen)
     otherIds <- nDistinctExcluding(size, idGen, selectedIds)
@@ -135,7 +137,7 @@ object ClothingRepositorySuite:
     otherColors = Color.values.toList.diff(selectedColors)
     priceRange <- rangeDoubleGen(10d, 1_000d)
     selectedGarments <- selectedIds.traverse(id =>
-      garmentRowGen(
+      garmentDbInGen(
         idGen = id,
         categoryGen = Gen.oneOf(selectedCategories),
         colorGen = Gen.oneOf(selectedColors),
@@ -144,7 +146,7 @@ object ClothingRepositorySuite:
       ),
     )
     otherGarments <- otherIds.traverse(id =>
-      garmentRowGen(
+      garmentDbInGen(
         idGen = id,
         categoryGen = Gen.oneOf(otherCategories),
         colorGen = Gen.oneOf(otherColors),
@@ -167,4 +169,4 @@ object ClothingRepositorySuite:
       case Descending(sortable) => roundedUnits.sortBy(_.price.amount).reverse
       case NoSort => roundedUnits
     diff = if sort == NoSort then sortById else identity[List[Garment]]
-  yield TestCase(salesTaxes, garments, filter, sort, expected, diff)
+  yield TestCase(taxRows, garments, filter, sort, expected, diff)

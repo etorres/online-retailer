@@ -1,9 +1,8 @@
 package es.eriktorr
 package clothing
 
-import clothing.Garment as DomainGarment
 import clothing.ProtobufWires.given
-import clothing.db.GarmentTable.{sortablePrice, given}
+import clothing.db.GarmentTable.given
 import clothing.protobuf.ClothingRequest.Filter.SearchTerm.Field as SearchTermField
 import clothing.protobuf.ClothingRequest.Sort.{Field as SortField, Order as SortOrder}
 import clothing.protobuf.{
@@ -76,7 +75,7 @@ final class ClothingService(clothingRepository: ClothingRepository, chunkSize: I
           searchTerm.field match
             case SearchTermField.Category => searchTermFrom(searchTerm, Category.option, "category")
             case SearchTermField.Model =>
-              searchTermFrom(searchTerm, DomainGarment.Model.option, "model")
+              searchTermFrom(searchTerm, Garment.Model.option, "model")
             case SearchTermField.Size =>
               searchTermFrom(searchTerm, x => Try(x.to[Size]).toOption, "size")
             case SearchTermField.Color => searchTermFrom(searchTerm, Color.option, "color")

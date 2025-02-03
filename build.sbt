@@ -83,9 +83,6 @@ lazy val usingSCache: Project => Project = withBaseSettings.compose(
 lazy val `clothing-client` = project
   .in(file("modules/clothing/clothing-client"))
   .configure(withBaseSettings)
-  .settings(
-    libraryDependencies ++= Seq(),
-  )
   .dependsOn(
     `clothing-dsl` % "test->test;compile->compile",
     `commons-grpc`,
@@ -128,6 +125,7 @@ lazy val `clothing-service` = project
   .configure(withBaseSettings)
   .settings(
     libraryDependencies ++= Seq(
+      "co.fs2" %% "fs2-core" % "3.11.0",
       "com.lmax" % "disruptor" % "3.4.4" % Runtime,
       "com.monovore" %% "decline-effect" % "2.5.0",
       "org.apache.logging.log4j" % "log4j-core" % "2.24.3" % Runtime,
@@ -142,6 +140,7 @@ lazy val `clothing-service` = project
   .dependsOn(
     `commons-database` % "test->test;compile->compile",
     `commons-grpc` % "test->test;compile->compile",
+    `taxes-database` % "test->test;compile->compile",
     `clothing-dsl` % "test->test;compile->compile",
     `clothing-protobuf`,
   )
@@ -208,9 +207,6 @@ lazy val `commons-lang` = project
 lazy val `electronics-client` = project
   .in(file("modules/electronics/electronics-client"))
   .configure(withBaseSettings)
-  .settings(
-    libraryDependencies ++= Seq(),
-  )
   .dependsOn(
     `commons-grpc`,
     `electronics-dsl` % "test->test;compile->compile",
@@ -252,6 +248,7 @@ lazy val `electronics-service` = project
   .configure(withBaseSettings)
   .settings(
     libraryDependencies ++= Seq(
+      "co.fs2" %% "fs2-core" % "3.11.0",
       "com.lmax" % "disruptor" % "3.4.4" % Runtime,
       "com.monovore" %% "decline-effect" % "2.5.0",
       "org.apache.logging.log4j" % "log4j-core" % "2.24.3" % Runtime,
@@ -266,6 +263,7 @@ lazy val `electronics-service` = project
   .dependsOn(
     `commons-database` % "test->test;compile->compile",
     `commons-grpc` % "test->test;compile->compile",
+    `taxes-database` % "test->test;compile->compile",
     `electronics-dsl` % "test->test;compile->compile",
     `electronics-protobuf`,
   )
@@ -294,9 +292,6 @@ lazy val `product-search` = project
 lazy val `stock-client` = project
   .in(file("modules/stock/stock-client"))
   .configure(withBaseSettings)
-  .settings(
-    libraryDependencies ++= Seq(),
-  )
   .dependsOn(
     `commons-grpc`,
     `stock-dsl` % "test->test;compile->compile",
@@ -338,6 +333,7 @@ lazy val `stock-service` = project
   .configure(withBaseSettings)
   .settings(
     libraryDependencies ++= Seq(
+      "co.fs2" %% "fs2-core" % "3.11.0",
       "com.lmax" % "disruptor" % "3.4.4" % Runtime,
       "com.monovore" %% "decline-effect" % "2.5.0",
       "org.apache.logging.log4j" % "log4j-core" % "2.24.3" % Runtime,
@@ -356,6 +352,23 @@ lazy val `stock-service` = project
     `stock-protobuf`,
   )
   .enablePlugins(JavaAppPackaging)
+
+lazy val `taxes-database` = project
+  .in(file("modules/taxes/taxes-database"))
+  .configure(usingDoobie)
+  .settings(
+    libraryDependencies ++= Seq(
+      "co.fs2" %% "fs2-core" % "3.11.0",
+      "com.softwaremill.common" %% "tagging" % "2.3.5",
+      "io.github.arainko" %% "ducktape" % "0.2.7",
+      "io.github.iltotore" %% "iron" % "2.6.0",
+      "org.typelevel" %% "cats-core" % "2.13.0",
+      "org.typelevel" %% "cats-effect" % "3.5.7",
+    ),
+  )
+  .dependsOn(
+    `commons-database` % "test->test;compile->compile",
+  )
 
 lazy val root = project
   .in(file("."))
@@ -376,6 +389,7 @@ lazy val root = project
     `stock-dsl`,
     `stock-protobuf`,
     `stock-service`,
+    `taxes-database`,
   )
   .settings(
     name := "online-retailer",

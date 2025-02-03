@@ -1,14 +1,14 @@
 package es.eriktorr
-package commons.domain
+package taxes
 
 import commons.refined.Constraints.UnitFraction
 
 import io.github.iltotore.iron.*
 import io.github.iltotore.iron.constraint.numeric.Interval
 
-final case class SalesTaxRow(id: SalesTaxRow.Id, tax: SalesTax, rate: SalesTaxRow.Rate)
+final case class Tax(id: Tax.Id, tax: SalesTax, rate: Tax.Rate)
 
-object SalesTaxRow:
+object Tax:
   type PositiveShort = Interval.Closed[0, 32_767]
 
   opaque type Id <: Int :| PositiveShort = Int :| PositiveShort

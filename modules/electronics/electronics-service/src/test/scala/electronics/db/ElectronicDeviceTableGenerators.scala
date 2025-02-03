@@ -1,20 +1,19 @@
 package es.eriktorr
 package electronics.db
 
-import commons.domain.DomainGenerators.salesTaxGen
-import commons.domain.SalesTax
-import commons.query.Row.row
-import electronics.db.ElectronicDevice.given
 import electronics.ElectronicDeviceGenerators.*
 import electronics.{Category, ElectronicDevice}
+import taxes.SalesTax
+import taxes.TaxGenerators.salesTaxGen
 
+import es.eriktorr.electronics.db.ElectronicDeviceTable.ElectronicDeviceDbIn
 import org.scalacheck.Gen
 import squants.energy.Power
 import squants.market.Money
 
 import java.time.LocalDate
 
-object ElectronicDeviceRowGenerators:
+object ElectronicDeviceTableGenerators:
   def electronicDeviceRowGen(
       idGen: Gen[ElectronicDevice.Id] = idGen,
       categoryGen: Gen[Category] = categoryGen,
@@ -25,7 +24,7 @@ object ElectronicDeviceRowGenerators:
       descriptionGen: Gen[ElectronicDevice.Description] = descriptionGen,
       launchDateGen: Gen[LocalDate] = launchDateGen,
       imagesGen: Gen[List[ElectronicDevice.Image]] = imagesGen,
-  ): Gen[ElectronicDeviceRow] = for
+  ): Gen[ElectronicDeviceDbIn] = for
     electronicDevice <- electronicDeviceGen(
       idGen = idGen,
       categoryGen = categoryGen,
@@ -36,9 +35,8 @@ object ElectronicDeviceRowGenerators:
       launchDateGen = launchDateGen,
       imagesGen = imagesGen,
     )
-    electronicDeviceRow = electronicDevice.row
     tax <- taxGen
-  yield ElectronicDeviceRow(
+  yield ElectronicDeviceDbIn(
     electronicDevice.id,
     electronicDevice.category,
     electronicDevice.model,
