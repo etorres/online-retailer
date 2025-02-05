@@ -29,4 +29,4 @@ object QueryBuilder:
     val fragments = if filter != Filter.NoFilter then List(filter.sql) else List.empty
     whereAndOpt(fragments)
 
-  def orderBy(sort: Sort): Fragment = sort.toSql
+  def orderBy(sort: Sort): Fragment = sort.sql

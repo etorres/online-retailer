@@ -8,16 +8,16 @@ import doobie.implicits.*
 import doobie.util.fragments.orderBy
 
 sealed trait Sort:
-  def toSql: Fragment
+  def sql: Fragment
 
 object Sort:
   final case class Ascending[T](sortable: Sortable[T]) extends Sort:
-    override def toSql: Fragment = orderByFrom(sortable) ++ fr"ASC"
+    override def sql: Fragment = orderByFrom(sortable) ++ fr"ASC"
 
   final case class Descending[T](sortable: Sortable[T]) extends Sort:
-    override def toSql: Fragment = orderByFrom(sortable) ++ fr"DESC"
+    override def sql: Fragment = orderByFrom(sortable) ++ fr"DESC"
 
   private def orderByFrom[T](sortable: Sortable[T]) = orderBy(Fragment.const(sortable.column))
 
   case object NoSort extends Sort:
-    override def toSql: Fragment = Fragment.empty
+    override def sql: Fragment = Fragment.empty

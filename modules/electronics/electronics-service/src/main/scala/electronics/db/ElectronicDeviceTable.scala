@@ -36,7 +36,7 @@ object ElectronicDeviceTable:
       model: ElectronicDevice.Model,
       powerConsumptionInWatts: Power,
       priceInEur: Money,
-      tax: SalesTax,
+      salesTax: SalesTax,
       description: ElectronicDevice.Description,
       launchDate: LocalDate,
       images: List[String],
@@ -48,7 +48,7 @@ object ElectronicDeviceTable:
         salesTaxToRate: Map[SalesTax, Tax.Rate],
     ): Option[ElectronicDevice] =
       for
-        rate <- salesTaxToRate.get(deviceDbIn.tax)
+        rate <- salesTaxToRate.get(deviceDbIn.salesTax)
         tax <- ElectronicDevice.Tax.option(rate)
         electronicDevice = deviceDbIn
           .into[ElectronicDevice]
@@ -161,7 +161,7 @@ object ElectronicDeviceTable:
            |${electronicDeviceDbIn.model},
            |${electronicDeviceDbIn.powerConsumptionInWatts},
            |${electronicDeviceDbIn.priceInEur},
-           |${electronicDeviceDbIn.tax},
+           |${electronicDeviceDbIn.salesTax},
            |${electronicDeviceDbIn.description},
            |${electronicDeviceDbIn.launchDate},
            |${electronicDeviceDbIn.images}""".stripMargin,

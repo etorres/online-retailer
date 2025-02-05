@@ -36,7 +36,7 @@ object GarmentTable:
       size: Size,
       color: Color,
       priceInEur: Money,
-      tax: SalesTax,
+      salesTax: SalesTax,
       description: Garment.Description,
       launchDate: LocalDate,
       images: List[String],
@@ -48,7 +48,7 @@ object GarmentTable:
         salesTaxToRate: Map[SalesTax, Tax.Rate],
     ): Option[Garment] =
       for
-        rate <- salesTaxToRate.get(garmentRow.tax)
+        rate <- salesTaxToRate.get(garmentRow.salesTax)
         tax <- Garment.Tax.option(rate)
         garment = garmentRow
           .into[Garment]
@@ -162,7 +162,7 @@ object GarmentTable:
            |${garmentDbIn.size},
            |${garmentDbIn.color},
            |${garmentDbIn.priceInEur},
-           |${garmentDbIn.tax},
+           |${garmentDbIn.salesTax},
            |${garmentDbIn.description},
            |${garmentDbIn.launchDate},
            |${garmentDbIn.images}""".stripMargin,
